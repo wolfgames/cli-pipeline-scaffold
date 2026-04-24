@@ -1,0 +1,265 @@
+pass_gate:
+  status: complete
+  pass: core
+  previous_pass_stable: true
+  previous_run_ref: null
+  skip_reason: ""
+  carry_forward: {}
+
+plan:
+  status: complete
+  gdd_type: "additive"
+  batches: 9
+  features: 22
+  new_files: 19
+  modified_files: 7
+  viewport_budget:
+    hud_px: 60
+    board_cell_px: 55
+    board_cols: 7
+    board_rows: 9
+    total_px: 635
+    available_px: 844
+    touch_target_check: "PASS"
+    tile_cap_check: "PASS"
+  resolved_questions: 5
+  out_of_pass_cos: []
+  warnings: []
+  resolved_questions_scalars:
+    q-game-name: "mars-bounce"
+    q-scoring-formula: "groupScore=(groupSize-1)*100 * (cascadeDepth+1) + comboBonus(500)"
+    q-chapter-boundary: 10
+    q-continue-backend: "stub-core-pass"
+    q-rocket-alien-direction: "modal-tap-then-row-col-tap"
+  carry_forward:
+    game_slug: "mars-bounce"
+    hook_batch: 2
+    priority_ordering_applied: true
+    cos_deferred_to_batch:
+      pattern-busters: 7
+      skill-curve: "deferred-to-pass-meta"
+    viewport_budget_derived_from: "greenfield_defaults"
+    critical_integration_point: "ecs-plugin"
+
+prime:
+  status: complete
+  project: "Mars Bounce (cli-pipeline-scaffold)"
+  stack: "pixi + solidjs + gsap + bun (vite, vitest)"
+  existing_features: 10
+  dom_overlays:
+    - element: WolfGamesLogo
+      position: bottom
+      height-px: 64
+  carry_forward:
+    target_device: "iPhone reference portrait 390x844 (dvh)"
+    game_greenfield: true
+    reserved_bottom_px: 64
+    reserved_top_px: 0
+    game_controller_stub: true
+    stack_gaps: []
+    host_rules_missing: true
+
+analyze:
+  status: complete
+  feature_counts:
+    exists: 6
+    partial: 1
+    new: 17
+    conflict: 0
+    content_gap: 4
+  conflict_breakdown:
+    reuse: 0
+    adapt: 0
+    replace: 0
+  high_risk:
+    - title-screen-theme
+    - game-screen-shell-theme
+    - ecs-plugin
+    - board-renderer
+    - tap-input-handler
+    - animation-event-queue
+    - hud
+  medium_risk:
+    - screen-flow
+    - loading-screen-theme
+    - results-screen-theme
+    - alien-entities
+    - planet-entities
+    - gravity-cascade
+    - combo-pieces
+    - board-state-machine
+    - win-sequence
+    - loss-sequence
+    - chapter-complete-screen
+    - level-generation
+  open_questions: 4
+  carry_forward:
+    critical_integration_point: ecs-plugin
+    transformative_hint: true
+
+implement:
+  status: complete
+  batches_completed: 9
+  tests_total: 52
+  test_files: 9
+  all_tests_pass: true
+  files_created:
+    - src/game/mars-bounce/state/MarsBouncePlugin.ts
+    - src/game/mars-bounce/index.ts
+    - src/game/mars-bounce/renderers/BoardRenderer.ts
+    - src/game/mars-bounce/renderers/BlockRenderer.ts
+    - src/game/mars-bounce/renderers/HudRenderer.ts
+    - src/game/mars-bounce/input/TapHandler.ts
+    - src/game/mars-bounce/animation/AnimationPlayer.ts
+    - src/game/mars-bounce/level/LevelGenerator.ts
+    - src/game/mars-bounce/level/SolvabilityValidator.ts
+    - src/game/mars-bounce/screens/startView.ts
+    - src/game/mars-bounce/screens/loadingTheme.ts
+    - src/game/mars-bounce/screens/gameController.ts
+    - tests/unit/game/mars-bounce/state/MarsBouncePlugin.test.ts
+    - tests/unit/game/mars-bounce/renderers/BoardRenderer.test.ts
+    - tests/unit/game/mars-bounce/renderers/BlockRenderer.test.ts
+    - tests/unit/game/mars-bounce/renderers/HudRenderer.test.ts
+    - tests/unit/game/mars-bounce/input/TapHandler.test.ts
+    - tests/unit/game/mars-bounce/animation/AnimationQueue.test.ts
+    - tests/unit/game/mars-bounce/level/LevelGenerator.test.ts
+    - tests/unit/game/mars-bounce/screens/startScreen.test.ts
+  files_modified:
+    - src/game/screens/LoadingScreen.tsx
+    - src/game/screens/StartScreen.tsx
+    - src/game/screens/ResultsScreen.tsx
+    - tests/unit/game/mars-bounce/GameController.test.ts
+  batch_summary:
+    batch_1: "ECS plugin — MarsBouncePlugin resources, initLevel, executeCluster, applyGravity, scoring"
+    batch_2: "BoardRenderer — grid layout, updateBoard, COLS=7 ROWS=9 constraints"
+    batch_3: "BlockRenderer + HudRenderer — sprite pools, score/moves/level display, ≥44px touch targets"
+    batch_4: "TapHandler — input routing, rocket direction modal, combo/invalid-tap paths"
+    batch_5: "AnimationPlayer — sequential event queue, STATE_EVENTS gate, phase management; TapHandler wire"
+    batch_6: "LevelGenerator + SolvabilityValidator — LCG seed, difficulty profiles, BFS flood-fill validation; win/loss/continue ECS tests"
+    batch_7: "Bounce planet logic — 4-directional neighbor check, firedBounce guard; combo thresholds (rocket/planet-buster/cosmic-storm)"
+    batch_8: "LoadingTheme + StartView — LOADING_BG_COLOR Mars red, createStartView factory, setupStartScreen scaffold contract; LoadingScreen/StartScreen wired"
+    batch_9: "ResultsScreen chapter-complete branch — chapter number, chapter score ScoreTally, Keep Going! button resets chapterScore; all chapter boundary ECS tests"
+  cos_findings:
+    - "applyGravity skipRefill=true two-pass pattern required for win-check before refill"
+    - "collectPlaybackOrder must be async (AnimationQueue test)"
+    - "activeDb() signal (not getActiveDb()) for ResultsScreen ECS access"
+    - "makeBoardWithGroup raster order (row=i/7, col=i%7) for COLS=7 boundary"
+  cos_gaps: []
+  carry_forward:
+    animation_gsap_integration: "playEvent stub in gameController; real GSAP tweens deferred to visual pass"
+    sprite_atlas_integration: "emoji fallbacks used throughout; atlas sprites deferred to asset pass"
+    audio_integration: "audio hooks present in deps; sound playback deferred to audio pass"
+
+player_flow:
+  status: complete
+  journey_walked: true
+  transitions_checked:
+    - loading_to_start
+    - start_to_game
+    - game_to_results_win
+    - game_to_results_loss
+    - results_to_game_next_level
+    - results_to_start_keep_going
+    - game_to_results_chapter_complete
+  fun_test_result: fail
+  issues_found: 6
+  fixes_applied: 5
+  carry_forward:
+    journey_breaks:
+      - "continue_btn: board-state not preserved on goto('game') — activeDb null after game-screen unmount (core-pass stub limitation)"
+    fun_test_failed_features:
+      - "alien-sprites-invisible: BlockRenderer uses Texture.EMPTY — entire board appears black; no visual feedback per tap (deferred to visual pass)"
+      - "animation-stubs: playEvent resolves immediately — no visual animation on cluster clear, gravity, or combo activation"
+    difficulty_mismatch: []
+    theme_drift:
+      - "results: bg-gradient-to-b from-slate-900 to-black is generic space, not Mars-red palette used on other screens"
+    cos_still_failing: []
+
+integrate:
+  status: complete
+  viewport_rederived: false
+  orphans_wired:
+    - "src/game/mars-bounce/screens/startView.ts:startPlay — removed invalid goto('intro') call; returning-player path unaffected; first-session caller already invokes renderIntro() inline"
+  orphans_deleted: []
+  fallbacks_unified:
+    - "DOM screens (LoadingScreen, StartScreen, ResultsScreen): emoji text with aria labels — consistent across all 3 screens"
+    - "GPU layer (BlockRenderer): Texture.EMPTY sprites currently uncalled in game loop; emojiForSpecies() defined but not wired to rendering path — deferred to visual pass per implement.carry_forward.sprite_atlas_integration"
+  unreachable: []
+  warnings:
+    - "BlockRenderer.createAlienSprite/createCellSprite use Texture.EMPTY as atlas fallback — renders invisible on GPU when wired; must switch to emoji Text fallback (per design-smells fallbackPriority) in visual pass before first playtest"
+  carry_forward:
+    viewport_budget_recomputed_total: null
+    asset_fallbacks_unified_style: "emoji"
+    unreachable_blocks_playability: false
+    orphan_wiring_blocked:
+      - "src/game/mars-bounce/renderers/BlockRenderer.ts:createAlienSprite — not called in game loop; wiring requires GSAP board sync + sprite pool management (visual pass)"
+      - "src/game/mars-bounce/renderers/BlockRenderer.ts:createCellSprite — not called in game loop; wiring requires GSAP board sync + sprite pool management (visual pass)"
+      - "src/game/mars-bounce/renderers/BlockRenderer.ts:emojiForSpecies — not wired into rendering path; must feed into Pixi Text nodes as fallback when atlas absent (visual pass)"
+      - "src/game/mars-bounce/renderers/BoardRenderer.ts:showDirectionOverlay — empty body, wired by TapHandler; implementing rocket ghost overlay requires new Pixi render logic (visual pass)"
+      - "src/game/mars-bounce/renderers/BoardRenderer.ts:hideDirectionOverlay — empty body, wired by TapHandler; implementing requires same Pixi overlay logic (visual pass)"
+
+verify:
+  status: complete
+  build_status: PASS
+  test_counts:
+    total: 193
+    passing: 193
+    failing: 0
+    preexisting_infra_failures: 4
+  fix_cycles: 1
+  playability_result: skipped
+  visual_verification: skipped
+  remaining_issues:
+    - "4 pre-existing infra test files use bun:test module incompatible with vitest runner (scaffold-e2e, scaffold-sync, scaffold-release, import-boundary) — 0 tests execute, 0 assertions affected"
+    - "alien-sprites-invisible: BlockRenderer uses Texture.EMPTY — board renders as empty sprites; deferred to visual pass"
+    - "animation-stubs: playEvent resolves immediately — no visual animation; deferred to visual pass"
+    - "results screen theme drift: generic space palette vs Mars-red; deferred to visual pass"
+  carry_forward:
+    browser_verified: false
+    unwinnable: false
+    perf_flags: []
+    mobile_viewport_check: "PASS — no 100vh in game code; core uses 100vh in upstream scaffold only"
+    mobile_touch_check: "PASS — touch-action:none + user-select:none on Pixi canvas in gameController.ts"
+    mobile_dpr_cap: "PASS — Math.min(devicePixelRatio, 2) in gameController.ts"
+    test_fix_summary: "Fixed createDomLoader missing from @wolfgames/components/core mock in facade.test.ts and facade-unload.test.ts; added missing facade methods: loadingState(), getGpuLoader(), dispose() to AssetCoordinatorFacade"
+
+stabilize:
+  status: complete
+  pipeline_status: partial
+  completion_ratio: "13/17 completeness items met; 4 gaps"
+  test_count: 199
+  cos_walk:
+    core-interaction: partial
+    canvas: partial
+    animated-dynamics: partial
+    scoring: pass
+  cos_failed: []
+  cos_rationale:
+    core-interaction: "Primary tap mechanic, pointer events, invalid-tap shake, and input gate all pass exit criteria; showDirectionOverlay/hideDirectionOverlay are empty body stubs — Rocket Alien direction ghost overlay is not rendered (deferred to visual pass per integrate.carry_forward)"
+    canvas: "Viewport geometry passes: 55 px cells, 7×9 board, HUD no-overlap confirmed; exit criterion 'theme visible at a glance' fails — BlockRenderer uses Texture.EMPTY so board renders invisible (deferred to visual pass per implement.carry_forward.sprite_atlas_integration)"
+    animated-dynamics: "Event queue architecture, stable entity IDs, board-diff, and input gate all implemented and tested; playEvent is a stub resolving immediately so no GSAP animations play; cascade escalation (speed/bounce/intensity scaling) not implemented (both deferred to visual pass per implement.carry_forward.animation_gsap_integration)"
+  completeness_gaps:
+    - "piece-visual-style-locked: Texture.EMPTY atlas fallback — board invisible; emoji Text fallback or real atlas required before playtest"
+    - "cascade-escalation: speed/bounce/intensity scaling with depth not implemented"
+    - "score-popup-animation: per-clear popup at clear location not implemented"
+    - "mobile-60fps-verified: browser_verified: false — no mobile playtest this run"
+  build_status: PASS
+  test_status: PASS
+  fix_cycles_used: 0
+  notes: >
+    mergeStatus([partial, partial, partial, complete], build=complete, tests=complete) = partial.
+    cos_failed is empty (all three partial CoS are deferred to visual pass, not blocking);
+    completeness_gaps non-empty → pipeline_status: partial per stabilize dispatch rules.
+    Edge-case tests added: 6 new tests (cascade scoring multiplier, invalid-tap-only queue,
+    Rocket cancel, level-15 profile, Bounce Planet path clear, combo Win transition).
+    Build: 0 errors. Tests: 199 passing / 0 failing (4 pre-existing infra excluded).
+  carry_forward:
+    next_pass_ready: false
+    unresolved_for_next_pass:
+      - "sprite-atlas-integration: emoji Text fallback or scene-mars-bounce atlas required"
+      - "gsap-playevent: playEvent stub must be replaced with real GSAP tweens"
+      - "cascade-escalation: speed/bounce/intensity scaling not implemented"
+      - "direction-overlay: showDirectionOverlay/hideDirectionOverlay empty stubs"
+      - "score-popup-animation: per-clear score popup not implemented"
+      - "mobile-60fps-verified: no browser playtest performed"
+    pass_stability: stable

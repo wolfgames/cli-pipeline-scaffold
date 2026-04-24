@@ -1,0 +1,41 @@
+run: "01"
+pipeline_version: "0.3.8"
+pass: "core"
+started: "2026-04-23T00:00:00Z"
+config:
+  think_only: false
+  trace: false
+  skip_groups: []
+  allow_skip_pass: false
+
+phases:
+  - id: pass-gate
+    status: complete
+    summary: "core pass has no N-1 gate check; pass_gate resolved to complete (core-pass-no-check)"
+  - id: prime
+    status: complete
+    summary: "stack detected: pixi+solidjs+gsap+bun(vite,vitest); game is greenfield DOM stub; 1 DOM overlay (WolfGamesLogo bottom 64px); buildCmd=bun run build; testCmd=bun run test:run; host_rules_missing (no .claude/rules/*.md files)"
+  - id: analyze
+    status: complete
+    summary: "24 features identified: 6 exists, 1 partial, 4 content-gap, 17 new; 0 conflicts; 5 high-risk; ecs-plugin is critical integration point"
+  - id: plan
+    status: complete
+    summary: "9 batches planned; 22 features; viewport budget: 55px cells 7×9; resolved 5 open questions (game-name=mars-bounce, scoring formula, chapter-boundary=10, continue=stub, rocket=modal-tap)"
+  - id: implement
+    status: complete
+    summary: "all 9 batches complete; 52 new tests; all pass; files_created=20, files_modified=4; animation GSAP integration and atlas sprites deferred to visual pass"
+  - id: player-flow
+    status: complete
+    summary: "6 screen transitions verified; 5 issues fixed; 1 carry-forward (continue board-state preservation stub); fun-test: alien sprites invisible"
+  - id: integrate
+    status: complete
+    summary: "orphans wired; fallbacks unified to emoji style; BlockRenderer sprite wiring deferred to visual pass"
+  - id: verify
+    status: complete
+    summary: "build PASS; 193/193 tests pass; 4 pre-existing infra failures (bun:test vs vitest); fix-cycle: 1"
+  - id: stabilize
+    status: complete
+    summary: "CoS walk: core-interaction=partial, canvas=partial, animated-dynamics=partial, scoring=pass; cos_failed=[]; completeness_gaps=4; build PASS; 199/199 tests; pipeline_status=partial; 6 edge-case tests added"
+
+finished: "2026-04-23T00:00:00Z"
+status: partial

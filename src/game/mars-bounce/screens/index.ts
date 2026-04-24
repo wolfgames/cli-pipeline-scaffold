@@ -1,0 +1,1 @@
+export { setupGame } from './gameController';

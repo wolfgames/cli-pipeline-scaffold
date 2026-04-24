@@ -1,0 +1,866 @@
+# implementation-plan.yml — Structured batch execution plan
+# Written by phase 30 (plan). Read by implement, integrate, player-flow, stabilize.
+# Game: Mars Bounce — tap-to-clear cluster puzzle on 7×9 Martian colony grid
+
+game: "Mars Bounce"
+gdd_type: "additive"
+# Rationale: 0 conflicts, 0 replacements. Core mechanic (tap-to-clear clusters) is new;
+# existing scaffold plumbing (coordinator, audio, pause, analytics) is preserved and reused.
+# Batch strategy: standard vertical slices from the start.
+total_batches: 9
+total_features: 22
+new_files: 19
+modified_files: 7
+
+# ─── VIEWPORT BUDGET ───────────────────────────────────────────────────────────
+# Source: src/core/config/viewport.ts (VIEWPORT_MIN_WIDTH, SAFE_PADDING, calculateMaxGridSize)
+# + prime.carry_forward (reserved_bottom_px: 64, reserved_top_px: 0)
+# Reference device: iPhone portrait 390×844 (dvh)
+
+viewport_budget:
+  default:
+    hud_px: 60                  # GPU HUD strip top — level / moves / score / pause (single row)
+    board_cell_px: 55           # floor(390 / 7) — constrained by column count
+    board_cols: 7
+    board_rows: 9
+    board_width_px: 385         # 7 × 55
+    board_height_px: 495        # 9 × 55
+    margin_above_board_px: 8
+    margin_below_board_px: 8
+    dom_reserved_bottom_px: 64  # WolfGamesLogo (prime.carry_forward.reserved_bottom_px)
+    dom_reserved_top_px: 0      # prime.carry_forward.reserved_top_px
+    total_px: 635               # 60 + 8 + 495 + 8 + 64
+    available_px: 844
+    spare_px: 209
+    board_fraction: 0.587       # 495/844 — just below 60% nominal; acceptable given spare
+    touch_target_min_px: 44     # MIN_TOUCH_TARGET from viewport.ts line 36
+    touch_target_check: "PASS"  # cell 55×55 px > 44 min
+    tile_cap_check: "PASS"      # cell 55 px < 64 cap
+  sources:
+    - file: "src/core/config/viewport.ts"
+      symbol: "SAFE_PADDING"
+      value: 10
+      line: 32
+    - file: "src/core/config/viewport.ts"
+      symbol: "MIN_TOUCH_TARGET"
+      value: 44
+      line: 36
+    - file: "src/core/config/viewport.ts"
+      symbol: "calculateMaxGridSize reservedBottom default"
+      value: 100
+      line: 57
+      note: "scaffold default; game overrides to 64 px (logo only, no controls)"
+    - file: "pipeline/runs/run-01/phase-summary.yml"
+      symbol: "prime.carry_forward.reserved_bottom_px"
+      value: 64
+    - file: "pipeline/runs/run-01/phase-summary.yml"
+      symbol: "prime.carry_forward.reserved_top_px"
+      value: 0
+
+# ─── RESOLVED QUESTIONS ────────────────────────────────────────────────────────
+
+resolved_questions:
+  - id: q-game-name
+    question: "What is the directory-safe slug for the game?"
+    decision: "mars-bounce"
+    rationale: |
+      GDD game title is 'Mars Bounce'. Slug: lowercase, hyphens only per naming convention.
+      Game root: src/game/mars-bounce/. All affected_files <game-root> tokens resolved to this.
+
+  - id: q-scoring-formula
+    question: "What are the exact scoring formula coefficients?"
+    decision: |
+      groupScore = (groupSize - 1) × 100
+      cascadeMultiplier = cascadeDepth + 1  (depth = number of cascade rounds after initial clear)
+      comboBonus = 500 per combo piece activated in this turn
+      turnScore = (groupScore × cascadeMultiplier) + comboBonus
+      levelScore += turnScore per turn
+      moveEfficiency = floor(movesRemaining / totalMoves × 1000) applied once at level end
+    rationale: |
+      CoS scoring requires multiplicative dimensions (chain × magnitude baseline). Formula gives:
+      - minimum groupSize 2 → 100 pts; groupSize 9+ → 800+ pts before cascade
+      - cascade depth 2 → 3× multiplier; depth 4 → 5× — skilled play asymptotically 3–5× beginner
+      - combo bonus 500 is half a 6-alien-clear with no cascade — meaningful but not dominant
+      - moveEfficiency adds ~1000 pts for a full-board clear with moves remaining
+      Wide range confirmed: beginner clearing 3s singly: ~100 pts/turn; expert clearing cascades: 2000+ pts/turn.
+
+  - id: q-chapter-boundary
+    question: "What constitutes a chapter? How many levels per chapter?"
+    decision: "10 levels per chapter; chapters align with difficulty profile boundaries (1–10, 11–20, 21–30, 31+)."
+    rationale: |
+      GDD difficulty profiles already define three bands (1–10, 11–30, 31+). Chapter
+      boundaries at every 10 levels provide natural milestone celebration frequency
+      (roughly 20–30 min of play per chapter). 31+ band spawns a new chapter every 10 levels.
+      Chapter Complete Screen fires when level % 10 == 0.
+
+  - id: q-continue-backend
+    question: "Continue system — stub (grant moves directly) or wire ad/currency scaffolding?"
+    decision: "Core pass: stub — Continue button grants 5 extra moves directly, no ad/currency plumbing."
+    rationale: |
+      Neither ads nor currency backend exists in scaffold. Wiring a stub now and deferring
+      ad/currency to meta pass keeps scope clean. Button is present and functional; backend
+      is swapped in later. GDD explicitly defers currency system.
+
+  - id: q-rocket-alien-direction
+    question: "How does Rocket Alien swipe interact with the tap interaction archetype?"
+    decision: |
+      Modal tap-then-direction-tap: first tap on Rocket Alien enters 'pending direction' state
+      (board blocked, Rocket Alien highlights with row/column ghost overlay). Second tap on any
+      cell in the desired row or column selects the direction and activates the Rocket.
+      No swipe gesture required — preserves single-gesture (tap) archetype throughout.
+    rationale: |
+      Swipe introduces a second gesture type not present elsewhere, complicating mobile
+      pointer handling. Tap-then-row/column-tap reuses the existing pointertap system,
+      avoids conflict with iOS scroll disambiguation, and is visually obvious via ghost overlay.
+      Direction-select UX: ghost row/column highlights on Rocket Alien tap, player taps any cell
+      in the desired lane. Cancel: tap the Rocket Alien again.
+
+# ─── PRESERVE LIST ─────────────────────────────────────────────────────────────
+# Additive GDD — existing infrastructure preserved as-is.
+
+preserve_list:
+  - module: "asset-coordinator (src/core/systems/coordinator)"
+    action: reuse
+    reason: "Layered DOM/GPU/audio loading, bundle resolution — works unchanged."
+  - module: "audio system (Howler)"
+    action: reuse
+    reason: "SFX/music API is game-agnostic; Mars Bounce adds audio-* bundles, not a new system."
+  - module: "pause overlay (src/core/systems/pause)"
+    action: reuse
+    reason: "Scaffold pause satisfies GDD Paused board state. HUD pause button calls into this."
+  - module: "analytics (PostHog via game-kit)"
+    action: reuse
+    reason: "No GDD delta. Instrument new events as needed without touching infrastructure."
+  - module: "error tracking (Sentry)"
+    action: reuse
+    reason: "No GDD delta."
+  - module: "WolfGamesLogo DOM overlay"
+    action: reuse
+    reason: "64 px bottom reservation baked into viewport budget. Do not move or resize."
+  - module: "screen manager (src/core/systems/screens)"
+    action: reuse
+    reason: "screen IDs loading/start/game/results used as-is. New content mounts behind these IDs."
+
+# ─── BATCHES ───────────────────────────────────────────────────────────────────
+
+batches:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BATCH 1: ECS Foundation + Game Controller Shell
+  # P0 — prerequisite for every game batch. Topology demands this comes first.
+  # hook_batch candidate: No — batch 1 produces no player-visible reward.
+  # Dependency topology forces this ahead of batch 2 (board needs ECS).
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: 1
+    name: "ECS Foundation — game state plugin + GameController pixi shell"
+    priority: P0
+    player_visible: |
+      Player sees the Pixi canvas mount (black canvas) and the game loop is running.
+      Not yet rewarding — this is pure infrastructure. hook_batch is batch 2.
+    features:
+      - ecs-plugin
+      - game-screen-shell-theme
+    cos_covered:
+      - core-interaction
+      - animated-dynamics
+      - scoring
+      - canvas
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [board-cells]
+      feedback_surfaces: [gpu-canvas, hud]
+    acceptance:
+      # ecs-plugin
+      - given: "game is initialised"
+        should: "ECS DB is created with MarsBounce plugin, setActiveDb(db) has been called"
+      - given: "game is initialised"
+        should: "boardState resource equals Idle, movesRemaining > 0, score equals 0"
+      - given: "game is destroyed"
+        should: "setActiveDb(null) is called and ECS observers do not fire after destroy"
+      # game-screen-shell-theme
+      - given: "GameScreen mounts"
+        should: "gameMode is 'pixi', Pixi Application is created and canvas is appended to container"
+      - given: "GameController.destroy() is called"
+        should: "Pixi app is destroyed, ECS bridge is cleaned up, canvas is removed from DOM"
+    test_loci:
+      - describe: "MarsBouncePlugin — state shape"
+        file: "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+        cases:
+          - "ECS DB is created with MarsBounce plugin, setActiveDb(db) has been called"
+          - "boardState resource equals Idle, movesRemaining > 0, score equals 0"
+          - "setActiveDb(null) is called and ECS observers do not fire after destroy"
+      - describe: "GameController — pixi init"
+        file: "tests/game/mars-bounce/GameController.test.ts"
+        cases:
+          - "gameMode is 'pixi', Pixi Application is created and canvas is appended to container"
+          - "Pixi app is destroyed, ECS bridge is cleaned up, canvas is removed from DOM"
+    files:
+      state:
+        - "src/game/mars-bounce/state/MarsBouncePlugin.ts"
+        - "src/game/mars-bounce/state/types.ts"
+        - "src/game/mars-bounce/state/bridgeEcsToSignals.ts"
+      integration:
+        - "src/game/mars-bounce/screens/gameController.ts"
+        - "src/game/mars-bounce/index.ts"
+      test:
+        - "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+        - "tests/game/mars-bounce/GameController.test.ts"
+    how:
+      - "Define MarsBouncePlugin: resources (boardState, movesRemaining, score, level, alienCellCount), entities (board cells with cellKind/species/comboType/position), transactions (setPhase, addScore, decrementMoves), actions (empty stubs for executeCluster, spawnAliens, applyGravity). Plugin property order: resources → archetypes → transactions → actions."
+      - "Replace gameController.ts DOM stub with a pixi-mode controller: create Application, call setActiveDb(db), bridgeEcsToSignals(db). Destroy order: tweens → app → cleanupObserve → setActiveDb(null)."
+      - "Export setupGame from index.ts. startView.ts untouched in this batch (title screen is batch 8)."
+    risk: HIGH
+    risk_reason: |
+      Central integration point — all game state flows through ECS plugin. Also switches
+      gameMode from 'dom' to 'pixi' in GameController. Rollback: revert gameController.ts to
+      DOM stub and remove MarsBouncePlugin. Verify: Pixi canvas mounts without console errors;
+      ECS DB serialises cleanly via Inspector; destroy() does not leak memory.
+    definition_of_done:
+      - "acceptance[] tests go red then green"
+      - "integration call site exists: gameController.ts calls setActiveDb(db) and bridgeEcsToSignals(db)"
+      - "gameMode is 'pixi' in returned GameController object"
+      - "bun run build and bun run test:run pass within 3 fix cycles"
+      - "no stubs/TODOs in shipped files"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BATCH 2: Board Renderer + Alien Sprites (hook batch)
+  # P0 — first player-visible reward: a real board with tappable alien sprites.
+  # This IS hook_batch: player sees colorful aliens on a grid for the first time.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: 2
+    name: "Board Renderer + Alien Sprites — 7×9 grid with 5 alien species"
+    priority: P0
+    player_visible: |
+      Player sees the 7×9 Mars colony grid filled with 5 colorful alien species.
+      Aliens are visually distinct by color AND shape. Board is centered between
+      HUD strip and logo. Tap targets are ≥ 44 px. First rewarding visual moment.
+    features:
+      - board-renderer
+      - alien-entities
+    cos_covered:
+      - canvas
+      - core-interaction
+      - animated-dynamics
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [board-cells]
+      feedback_surfaces: [gpu-canvas]
+    acceptance:
+      # board-renderer
+      - given: "board is initialised with 390×844 viewport"
+        should: "7×9 grid renders with cell size 55×55 px, board centered horizontally"
+      - given: "board is initialised"
+        should: "board container has eventMode 'passive'; individual cell sprites have eventMode 'static'"
+      - given: "cell at row 0 col 0 is a Zorbling"
+        should: "its Pixi hit area is at least 44×44 px"
+      # alien-entities
+      - given: "5 alien species are rendered"
+        should: "each species has a distinct texture frame AND a distinct shape cue (not color alone)"
+      - given: "species Zorbling is rendered"
+        should: "sprite frame key is 'zorbling' from scene-mars-bounce atlas"
+    test_loci:
+      - describe: "BoardRenderer — grid layout"
+        file: "tests/game/mars-bounce/renderers/BoardRenderer.test.ts"
+        cases:
+          - "7×9 grid renders with cell size 55×55 px, board centered horizontally"
+          - "board container has eventMode 'passive'; individual cell sprites have eventMode 'static'"
+          - "its Pixi hit area is at least 44×44 px"
+      - describe: "BlockRenderer — alien sprites"
+        file: "tests/game/mars-bounce/renderers/BlockRenderer.test.ts"
+        cases:
+          - "each species has a distinct texture frame AND a distinct shape cue (not color alone)"
+          - "sprite frame key is 'zorbling' from scene-mars-bounce atlas"
+    files:
+      state:
+        - "src/game/mars-bounce/state/MarsBouncePlugin.ts"
+        - "src/game/asset-manifest.ts"
+      integration:
+        - "src/game/mars-bounce/renderers/BoardRenderer.ts"
+        - "src/game/mars-bounce/renderers/BlockRenderer.ts"
+        - "src/game/mars-bounce/screens/gameController.ts"
+      test:
+        - "tests/game/mars-bounce/renderers/BoardRenderer.test.ts"
+        - "tests/game/mars-bounce/renderers/BlockRenderer.test.ts"
+    how:
+      - "Implement BoardRenderer.init(data, viewportW, viewportH, reservedTop, reservedBottom): compute cellSize = floor(viewportW / 7), board width = 7 × cellSize, board height = 9 × cellSize. Center board horizontally. reservedTop = 60 (HUD), reservedBottom = 64 (logo). Set eventMode='passive' on container; eventMode='static' on each cell sprite."
+      - "Implement BlockRenderer: frame pool keyed by stable entity ID. 5 alien species: Zorbling (round), Blipp (teardrop), Glurp (blobby), Yipp (star), Plonk (cube). Frames from scene-mars-bounce atlas (asset-manifest entry). Visual size 36–44 pt centred in 55 pt cell. HitArea explicitly 44×44 px."
+      - "Register scene-mars-bounce bundle in src/game/asset-manifest.ts. Wire BoardRenderer to gameController.ts: init after Pixi Application is ready, pass viewport dimensions and reserved heights."
+    risk: HIGH
+    risk_reason: |
+      First real GPU render. Viewport budget must be precise or board overlaps logo/HUD.
+      Verify: board fits completely in viewport (no clipping), all cells ≥ 44 pt hit area,
+      no horizontal scroll. Atlas bundle load failure → board stays empty — add error log.
+    definition_of_done:
+      - "acceptance[] tests go red then green"
+      - "integration call site: gameController.ts calls boardRenderer.init() after app ready"
+      - "7×9 board visible in browser, aliens distinguishable without color alone"
+      - "bun run build and bun run test:run pass within 3 fix cycles"
+      - "touch targets ≥ 44 px per UX floor check"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BATCH 3: Tap Input + Cluster Clear Logic + Board State Machine
+  # P0 — game is not playable without tap-to-clear and win/loss conditions.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: 3
+    name: "Tap Input + Cluster Clear + Board State Machine"
+    priority: P0
+    player_visible: |
+      Player can tap a group of 2+ matching aliens — they launch off-screen (instant, no
+      animation yet). Isolated tap gets a shake + thud. Move counter decrements. Game
+      detects win (board cleared) and loss (moves = 0). Input is blocked when board is
+      not Idle.
+    features:
+      - tap-input-handler
+      - board-state-machine
+    cos_covered:
+      - core-interaction
+      - animated-dynamics
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [board-cells]
+      feedback_surfaces: [gpu-canvas, audio]
+    acceptance:
+      # tap-input-handler
+      - given: "player taps a cell whose adjacent group has size ≥ 2"
+        should: "all cells in the group are cleared from the board; movesRemaining decrements by 1"
+      - given: "player taps an isolated cell (group size 1)"
+        should: "cell shakes (3-frame wiggle animation) and thud SFX plays; no state change"
+      - given: "boardState is Animating"
+        should: "tap events are ignored (no state change, no feedback)"
+      - given: "a Rocket Alien cell is tapped"
+        should: "boardState enters 'pending-direction'; ghost overlay highlights all cells in same row and column"
+      # board-state-machine
+      - given: "alienCellCount becomes 0 and boardState is Idle"
+        should: "boardState transitions to Won"
+      - given: "movesRemaining becomes 0 and alienCellCount > 0 and boardState is Idle"
+        should: "boardState transitions to Lost"
+      - given: "boardState is Won or Lost"
+        should: "all tap input is blocked"
+    test_loci:
+      - describe: "TapHandler — cluster selection"
+        file: "tests/game/mars-bounce/input/TapHandler.test.ts"
+        cases:
+          - "all cells in the group are cleared from the board; movesRemaining decrements by 1"
+          - "cell shakes (3-frame wiggle animation) and thud SFX plays; no state change"
+          - "tap events are ignored (no state change, no feedback)"
+          - "boardState enters 'pending-direction'; ghost overlay highlights all cells in same row and column"
+      - describe: "MarsBouncePlugin — board state machine"
+        file: "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+        cases:
+          - "boardState transitions to Won"
+          - "boardState transitions to Lost"
+          - "all tap input is blocked"
+    files:
+      state:
+        - "src/game/mars-bounce/state/MarsBouncePlugin.ts"
+        - "src/game/mars-bounce/input/interaction-archetype.md"
+      integration:
+        - "src/game/mars-bounce/input/TapHandler.ts"
+        - "src/game/mars-bounce/screens/gameController.ts"
+      test:
+        - "tests/game/mars-bounce/input/TapHandler.test.ts"
+        - "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+    how:
+      - "Write interaction-archetype.md before implementing input (per core-interaction CoS). Archetype: primary gesture is single pointertap. Secondary gesture: tap-then-row/column-tap for Rocket Alien direction (modal, blocked during pending-direction). touch-action: none on canvas container CSS."
+      - "Implement TapHandler: subscribe to pointertap on board container. On tap, check boardState == Idle; if not, return. Flood-fill from tapped cell to compute group. Size ≥ 2 → db.actions.executeCluster({group, rng}); size 1 → reject feedback (shake GSAP + audio thud SFX)."
+      - "Add board-state-machine transitions to MarsBouncePlugin: setPhase transaction accepts Idle|Animating|Won|Lost|Paused. Win check: alienCellCount==0 && boardState==Idle → setPhase(Won). Loss check: movesRemaining==0 && alienCellCount>0 && boardState==Idle → setPhase(Lost). Wire checks at end of executeCluster action."
+    risk: HIGH
+    risk_reason: |
+      Input wiring is the single riskiest plumbing step. touch-action, pointer capture,
+      and input-gate must all be correct. Also modifies MarsBouncePlugin (central state).
+      Rollback: disable pointertap listener in TapHandler.init(). Verify: tap on each cell
+      fires exactly once, rejected tap never modifies state, Won/Lost trigger correctly after
+      manual state injection.
+    definition_of_done:
+      - "acceptance[] tests go red then green"
+      - "interaction-archetype.md written before TapHandler code"
+      - "integration call site: gameController.ts wires TapHandler.init(boardContainer)"
+      - "tap group clears visually from board, move counter decrements"
+      - "isolated tap shows shake + thud with no state change"
+      - "bun run build and bun run test:run pass within 3 fix cycles"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BATCH 4: HUD (move counter, score, level, pause button)
+  # P0 — game is unplayable without move counter and score display.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: 4
+    name: "HUD — move counter, score, level number, pause button"
+    priority: P0
+    player_visible: |
+      Top strip shows level number (left), move counter (center), score (right), and pause
+      button (far right). Move counter ticks down on each tap. Score updates after each
+      clear. Pause button ≥ 44×44 pt. HUD does not overlap board or logo.
+    features:
+      - hud
+      - scoring-system
+    cos_covered:
+      - canvas
+      - scoring
+    ux_zones:
+      thumb_zone: out-of-reach
+      touch_targets: [pause-btn]
+      feedback_surfaces: [hud-overlay, hud-score]
+    acceptance:
+      # hud
+      - given: "HUD is initialised with reservedTop=60 and viewportW=390"
+        should: "HUD fits within top 60 px, no visual overlap with board row 0"
+      - given: "movesRemaining resource changes"
+        should: "move counter text updates within the same frame"
+      - given: "pause button is tapped"
+        should: "pause overlay opens (scaffold pause system fires)"
+      - given: "pause button hit area is measured"
+        should: "hit area is ≥ 44×44 px"
+      # scoring-system
+      - given: "player clears a group of size 3 with cascade depth 0"
+        should: "score increases by 200 ((3-1)×100 × (0+1))"
+      - given: "player clears a group of size 5 with cascade depth 2"
+        should: "score increases by 1200 ((5-1)×100 × (2+1))"
+      - given: "a combo piece activates during a turn"
+        should: "score increases by an additional 500 (comboBonus)"
+    test_loci:
+      - describe: "HudRenderer — layout"
+        file: "tests/game/mars-bounce/renderers/HudRenderer.test.ts"
+        cases:
+          - "HUD fits within top 60 px, no visual overlap with board row 0"
+          - "move counter text updates within the same frame"
+          - "hit area is ≥ 44×44 px"
+          - "pause overlay opens (scaffold pause system fires)"
+      - describe: "MarsBouncePlugin — scoring formula"
+        file: "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+        cases:
+          - "score increases by 200 ((3-1)×100 × (0+1))"
+          - "score increases by 1200 ((5-1)×100 × (2+1))"
+          - "score increases by an additional 500 (comboBonus)"
+    files:
+      state:
+        - "src/game/mars-bounce/state/MarsBouncePlugin.ts"
+      integration:
+        - "src/game/mars-bounce/renderers/HudRenderer.ts"
+        - "src/game/mars-bounce/screens/gameController.ts"
+      test:
+        - "tests/game/mars-bounce/renderers/HudRenderer.test.ts"
+        - "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+    how:
+      - "Implement HudRenderer: GPU Pixi Container in top 60 px strip. Level number left (20 pt text), move counter center (28 pt, bold — most important glanceable value), score right (20 pt), pause icon button far right. All text ≥ 16 px per core-guidelines. Pause hit area: invisible padding to 44×44 px."
+      - "Add scoring logic to MarsBouncePlugin.executeCluster action: compute groupScore, cascadeMultiplier, comboBonus per resolved_questions formula. Call db.transactions.addScore(turnScore). bridgeEcsToSignals propagates score to HUD."
+      - "Wire HudRenderer to gameController.ts: init(viewportW, reservedTop=60), update on score/moves/level resource changes."
+    risk: HIGH
+    risk_reason: |
+      HUD adds new UI element to viewport. Must not overlap board (row 0 at y=68 px — HUD ends
+      at 60 + 8 margin). Pause button wires into scaffold pause system; incorrect eventMode on HUD
+      container could kill board input. Verify: board row 0 is not occluded; pause fires correctly.
+    definition_of_done:
+      - "acceptance[] tests go red then green"
+      - "integration call site: gameController.ts calls hudRenderer.init() and wires ECS observe"
+      - "HUD visible in browser; move counter decrements on tap; score increments on clear"
+      - "pause button tap opens pause overlay"
+      - "CoS sub-walk: canvas — HUD does not overlap board (55 px cells start at y=68)"
+      - "bun run build and bun run test:run pass within 3 fix cycles"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BATCH 5: Animation Event Queue + Gravity Cascade
+  # P0 — gameplay is unacceptable without animation (instant state changes).
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: 5
+    name: "Animation Event Queue + Gravity Cascade"
+    priority: P0
+    player_visible: |
+      After a tap, aliens animate: group lights up → cluster launches off-screen →
+      remaining aliens fall under gravity (80 ms per step) → new aliens bounce in from
+      top (200 ms spring). Input is gated until animation completes. Board never
+      teleports — every change has a visible transition.
+    features:
+      - animation-event-queue
+      - gravity-cascade
+    cos_covered:
+      - animated-dynamics
+      - core-interaction
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [board-cells]
+      feedback_surfaces: [gpu-canvas]
+    acceptance:
+      # animation-event-queue
+      - given: "player taps a group of 3 matching aliens"
+        should: "boardState transitions to Animating before any visual change starts"
+      - given: "animation queue plays back cluster-cleared event"
+        should: "group cells animate off-screen before gravity events begin"
+      - given: "animation queue reaches turn-complete event"
+        should: "boardState transitions to Idle and input is re-enabled"
+      - given: "an invalid-tap event is in the queue"
+        should: "cell shake GSAP tween plays and no board state mutation occurs"
+      # gravity-cascade
+      - given: "aliens are cleared leaving a gap in column 3"
+        should: "aliens above fall down (80 ms ease-in per cell step)"
+      - given: "a column has fewer than 9 aliens after gravity"
+        should: "new aliens bounce in from top of column (200 ms spring, scale 1.15→1.0)"
+      - given: "a Rocky Planet is on the board"
+        should: "it does not fall during gravity resolution"
+      - given: "board diff is computed before and after a clear"
+        should: "only cells with changed state receive GSAP updates — unchanged cells are not re-tweened"
+    test_loci:
+      - describe: "AnimationQueue — event playback order"
+        file: "tests/game/mars-bounce/animation/AnimationQueue.test.ts"
+        cases:
+          - "boardState transitions to Animating before any visual change starts"
+          - "group cells animate off-screen before gravity events begin"
+          - "boardState transitions to Idle and input is re-enabled"
+          - "cell shake GSAP tween plays and no board state mutation occurs"
+      - describe: "MarsBouncePlugin — gravity and cascade"
+        file: "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+        cases:
+          - "aliens above fall down (80 ms ease-in per cell step)"
+          - "new aliens bounce in from top of column (200 ms spring, scale 1.15→1.0)"
+          - "it does not fall during gravity resolution"
+          - "only cells with changed state receive GSAP updates — unchanged cells are not re-tweened"
+    files:
+      state:
+        - "src/game/mars-bounce/state/MarsBouncePlugin.ts"
+      integration:
+        - "src/game/mars-bounce/animation/AnimationQueue.ts"
+        - "src/game/mars-bounce/animation/AnimationPlayer.ts"
+        - "src/game/mars-bounce/renderers/BoardRenderer.ts"
+        - "src/game/mars-bounce/screens/gameController.ts"
+      test:
+        - "tests/game/mars-bounce/animation/AnimationQueue.test.ts"
+        - "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+    how:
+      - "Implement AnimationQueue: executeCluster action returns event array {type, payload}. Event types: cluster-cleared, gravity-drop, elements-entered, invalid-tap, win-sequence-start, loss-sequence-start, settle, turn-complete. AnimationPlayer.playQueue(events) resolves GSAP tweens sequentially. boardState=Animating set before queue starts; Idle restored on turn-complete."
+      - "Implement gravity cascade in MarsBouncePlugin.applyGravity transaction: top-to-bottom left-to-right sweep. Rocky Planets skip. Missing cells above refilled with seeded RNG from level.activeSpecies pool. Return array of {entityId, fromRow, toRow} for board-diff animation. New aliens get elements-entered events."
+      - "Update BoardRenderer.syncBoard(boardDiff): iterate only changed entity positions, move sprites via GSAP (no full re-render). Keyed by stable entity ID."
+    risk: HIGH
+    risk_reason: |
+      Cross-cutting change: ECS transactions, board renderer, and input gate must all be wired
+      to the same queue. Incorrect event ordering → board feels glitchy. Board-diff keying is
+      critical for animated-dynamics CoS (stable entity IDs). Rollback: disable AnimationPlayer,
+      revert boardState to instant (Idle→Idle transitions). Verify: no frame where board is
+      partially updated; input re-enables exactly after turn-complete.
+    definition_of_done:
+      - "acceptance[] tests go red then green"
+      - "integration: gameController.ts feeds executeCluster return value to AnimationPlayer.playQueue"
+      - "animated-dynamics CoS sub-walk: every board change animated; no instant state transitions; board-diff used"
+      - "core-interaction CoS sub-walk: input blocked during Animating; re-enabled on turn-complete"
+      - "bun run build and bun run test:run pass within 3 fix cycles"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BATCH 6: Level Generation + Results Screen
+  # P0 — game cannot complete a full level loop without level gen and results screens.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: 6
+    name: "Level Generation + Results Screen (win + loss branches)"
+    priority: P0
+    player_visible: |
+      Level 1 board populates from seeded generator (3 species, no planets, solvable).
+      Win → Level Complete screen slides up with score tally + Next Level button.
+      Loss → Loss Screen slides up with sad alien, Try Again + Continue (grants 5 moves) buttons.
+    features:
+      - level-generation
+      - results-screen-theme
+      - win-sequence
+      - loss-sequence
+      - continue-system
+    cos_covered:
+      - animated-dynamics
+      - scoring
+      - core-interaction
+      - canvas
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [next-level-btn, try-again-btn, continue-btn, main-menu-btn]
+      feedback_surfaces: [gpu-canvas, dom-overlay, score-display, move-counter]
+    acceptance:
+      # level-generation
+      - given: "level 1 is generated with seed 12345"
+        should: "board contains only 3 alien species, no planet entities, and has at least one group of size ≥ 2"
+      - given: "generated board is validated"
+        should: "largestGroupSize ≥ 2 and clearablePercent ≥ 0.40"
+      - given: "validation fails after 10 retries"
+        should: "fallback board is generated: 3 species, 35 moves, no planets"
+      # results-screen-theme / win-sequence
+      - given: "boardState transitions to Won"
+        should: "all board cells pulse (scale 1.0→1.1→1.0, 200 ms) before screen slides up"
+      - given: "win Level Complete screen is visible"
+        should: "score tally animation runs to final score (600 ms), then Next Level button appears"
+      - given: "Next Level button is tapped"
+        should: "next level is loaded and board resets with new level seed"
+      # results-screen-theme / loss-sequence
+      - given: "boardState transitions to Lost"
+        should: "move counter shakes (3× wiggle, 300 ms), then alien cells droop (scale 0.9, alpha 0.6)"
+      - given: "Loss Screen is visible"
+        should: "Try Again and Continue buttons are both present and ≥ 44×44 px"
+      # continue-system
+      - given: "Continue button is tapped"
+        should: "movesRemaining increases by 5, boardState returns to Idle, board is preserved"
+    test_loci:
+      - describe: "LevelGenerator — board generation"
+        file: "tests/game/mars-bounce/level/LevelGenerator.test.ts"
+        cases:
+          - "board contains only 3 alien species, no planet entities, and has at least one group of size ≥ 2"
+          - "largestGroupSize ≥ 2 and clearablePercent ≥ 0.40"
+          - "fallback board is generated: 3 species, 35 moves, no planets"
+      - describe: "GameController — win/loss sequences"
+        file: "tests/game/mars-bounce/GameController.test.ts"
+        cases:
+          - "all board cells pulse (scale 1.0→1.1→1.0, 200 ms) before screen slides up"
+          - "score tally animation runs to final score (600 ms), then Next Level button appears"
+          - "next level is loaded and board resets with new level seed"
+          - "move counter shakes (3× wiggle, 300 ms), then alien cells droop (scale 0.9, alpha 0.6)"
+          - "Try Again and Continue buttons are both present and ≥ 44×44 px"
+          - "movesRemaining increases by 5, boardState returns to Idle, board is preserved"
+    files:
+      state:
+        - "src/game/mars-bounce/level/LevelGenerator.ts"
+        - "src/game/mars-bounce/level/SolvabilityValidator.ts"
+        - "src/game/mars-bounce/state/MarsBouncePlugin.ts"
+      integration:
+        - "src/game/screens/ResultsScreen.tsx"
+        - "src/game/mars-bounce/screens/gameController.ts"
+      test:
+        - "tests/game/mars-bounce/level/LevelGenerator.test.ts"
+        - "tests/game/mars-bounce/GameController.test.ts"
+    how:
+      - "Implement LevelGenerator: seed formula levelNumber × 12345. Profile dispatch: levels 1–10 (3 species, maxMoves=30, noPlanets), 11–30 (4 species, planets after lvl 11), 31+ (5 species, all entities). SolvabilityValidator: check largestGroupSize ≥ 2, clearablePercent ≥ 0.40, no 3×3 Rocky island. Max 10 retries (seed += 1); fallback: 3 species, 35 moves, no planets."
+      - "Update ResultsScreen.tsx: add win/loss branch prop. Win branch: score tally (600 ms counter animation), celebration aliens (staggered GSAP from edges), Next Level button. Loss branch: sad alien (2-frame loop), Try Again + Continue buttons. Continue: ECS movesRemaining += 5, goto('game')."
+      - "Add win-sequence and loss-sequence to AnimationQueue event types. GameController watches boardState resource: Won → trigger win events; Lost → trigger loss events."
+    risk: MEDIUM
+    risk_reason: |
+      ResultsScreen is a DOM SolidJS component — no Pixi rules. Level generator must produce
+      solvable boards deterministically. Verify: level 1 seed 12345 always produces same board;
+      win/loss animations complete without JS errors; Continue preserves board state correctly.
+    definition_of_done:
+      - "acceptance[] tests go red then green"
+      - "level 1 loads deterministically from seed 12345"
+      - "win → Level Complete screen visible with score tally; loss → Loss Screen visible with buttons"
+      - "Continue grants 5 moves and preserves board"
+      - "CoS sub-walk: animated-dynamics — no instant state changes on win/loss"
+      - "bun run build and bun run test:run pass within 3 fix cycles"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BATCH 7: Planet Entities + Combo Pieces (infrastructure)
+  # P1 — essential feel; game loops without it but lacks depth.
+  # CoS pattern-busters deferred to secondary pass.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: 7
+    name: "Planet Entities + Combo Pieces (core-pass infrastructure)"
+    priority: P1
+    player_visible: |
+      Rocky Planet appears as an immovable blocker on levels 11+. Bounce Planet falls
+      and clears a column/row when triggered. Rocket Alien (5–6 clear), Planet Buster
+      (7–8 clear), and Cosmic Storm (9+ clear) combo pieces spawn and activate.
+      Combo visuals are distinct. Pattern-busters CoS full walk deferred to secondary pass.
+    features:
+      - planet-entities
+      - combo-pieces
+    cos_covered:
+      - canvas
+      - core-interaction
+      - animated-dynamics
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [board-cells, combo-piece-cell]
+      feedback_surfaces: [gpu-canvas, audio]
+    acceptance:
+      # planet-entities
+      - given: "Rocky Planet is on the board and gravity resolves"
+        should: "Rocky Planet does not fall; its position is unchanged"
+      - given: "Bounce Planet is adjacent to a cleared group"
+        should: "Bounce Planet activates: launches in a random cardinal direction, clearing first row or column it crosses"
+      - given: "combo blast zone overlaps a Rocky Planet"
+        should: "Rocky Planet is cleared"
+      # combo-pieces
+      - given: "player clears a group of size 5"
+        should: "one Rocket Alien combo piece spawns at a random cell in the cleared group's column"
+      - given: "Rocket Alien is tapped"
+        should: "boardState enters pending-direction; row and column ghost overlays appear"
+      - given: "player taps a cell in the target column while in pending-direction"
+        should: "Rocket Alien activates, clearing all cells in that column"
+      - given: "player clears a group of size 7"
+        should: "one Planet Buster spawns; on tap it clears 3×3 zone centered on its cell"
+      - given: "player clears a group of size 9"
+        should: "Cosmic Storm spawns; on tap it clears all aliens of one random species (seeded RNG)"
+    test_loci:
+      - describe: "BlockRenderer — planet and combo sprites"
+        file: "tests/game/mars-bounce/renderers/BlockRenderer.test.ts"
+        cases:
+          - "Rocky Planet does not fall; its position is unchanged"
+          - "Bounce Planet activates: launches in a random cardinal direction, clearing first row or column it crosses"
+          - "Rocky Planet is cleared"
+      - describe: "TapHandler — combo piece activation"
+        file: "tests/game/mars-bounce/input/TapHandler.test.ts"
+        cases:
+          - "one Rocket Alien combo piece spawns at a random cell in the cleared group's column"
+          - "boardState enters pending-direction; row and column ghost overlays appear"
+          - "player taps a cell in the target column while in pending-direction"
+          - "Rocket Alien activates, clearing all cells in that column"
+      - describe: "MarsBouncePlugin — combo spawn thresholds"
+        file: "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+        cases:
+          - "one Planet Buster spawns; on tap it clears 3×3 zone centered on its cell"
+          - "Cosmic Storm spawns; on tap it clears all aliens of one random species (seeded RNG)"
+    files:
+      state:
+        - "src/game/mars-bounce/state/MarsBouncePlugin.ts"
+      integration:
+        - "src/game/mars-bounce/renderers/BlockRenderer.ts"
+        - "src/game/mars-bounce/input/TapHandler.ts"
+      test:
+        - "tests/game/mars-bounce/renderers/BlockRenderer.test.ts"
+        - "tests/game/mars-bounce/input/TapHandler.test.ts"
+        - "tests/game/mars-bounce/state/MarsBouncePlugin.test.ts"
+    how:
+      - "Add Rocky Planet and Bounce Planet cellKind variants to MarsBouncePlugin. Rocky: anchored=true, skipGravity=true. Bounce: triggeredBy=adjacentClear, clearPath=cardinal direction. Bounce path computed before animation (BFS from Bounce Planet cell outward). No Bounce chain reactions in same frame."
+      - "Add combo spawn logic to executeCluster action: if groupSize in [5,6] spawn RocketAlien at seeded random position in cleared column; [7,8] → PlanetBuster; [9+] → CosmicStorm. Combo pieces are a special cellKind with comboType field."
+      - "Extend TapHandler: detect combo cellKind on tap. RocketAlien → set boardState=pending-direction, render ghost overlay via BoardRenderer.showDirectionOverlay(cell). Direction tap → db.actions.activateCombo({cell, direction}). PlanetBuster/CosmicStorm → db.actions.activateCombo({cell}) immediately."
+    risk: MEDIUM
+    risk_reason: |
+      Adds multiple new entity types and a new TapHandler state (pending-direction).
+      Bounce Planet chain prevention requires care. Verify: Rocky never moves; Bounce path
+      computed before animation; Rocket direction overlay cancels cleanly on re-tap.
+      pattern-busters CoS full walk deferred to secondary pass — record in cos_deferred.
+    definition_of_done:
+      - "acceptance[] tests go red then green"
+      - "Rocky Planet visible and immovable; Bounce Planet triggers correctly"
+      - "all 3 combo pieces spawn at correct thresholds and activate on tap"
+      - "Rocket direction-select overlay renders and cancels cleanly"
+      - "CoS sub-walk: canvas — combo sprites visually distinct; animated-dynamics — combo activations animated"
+      - "bun run build and bun run test:run pass within 3 fix cycles"
+      - "note: pattern-busters CoS walk recorded as deferred to secondary pass"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BATCH 8: Screen Identity (loading, title, first-time intro)
+  # P1 — essential feel; game is content-empty without themed screens.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: 8
+    name: "Screen Identity — loading theme, title screen, first-time intro"
+    priority: P1
+    player_visible: |
+      Loading screen shows Mars landscape progress bar. Title screen has animated
+      Mars GPU scene, game logo, Play button. First session shows 2-panel visual
+      onboarding (setting + mechanic) before Level 1. Returning players skip intro.
+    features:
+      - loading-screen-theme
+      - title-screen-theme
+      - screen-flow
+      - first-time-intro
+    cos_covered:
+      - canvas
+      - core-interaction
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [play-btn, settings-icon, tap-to-advance]
+      feedback_surfaces: [background-animation, play-btn, progress-bar, dom-overlay]
+    acceptance:
+      # loading-screen-theme
+      - given: "assets are loading"
+        should: "loading screen shows Mars landscape background and animated progress bar (not green spinner)"
+      # title-screen-theme
+      - given: "title screen mounts"
+        should: "Play button is visible and centred; settings icon is in top-right corner (≥ 44 pt)"
+      - given: "Play button is tapped on first session"
+        should: "audio is unlocked, GPU is initialised, and first-time-intro sequence starts"
+      - given: "Play button is tapped on returning session"
+        should: "audio is unlocked, GPU is initialised, and Level 1 loads directly"
+      # first-time-intro
+      - given: "first session is detected (no localStorage firstSeen flag)"
+        should: "2-panel intro shows: panel 1 'They need your help!', panel 2 'Tap matching aliens to launch them home.'"
+      - given: "player taps panel 2"
+        should: "Level 1 Gameplay Screen loads"
+      - given: "second session is detected (localStorage firstSeen flag exists)"
+        should: "intro screens are not shown; Level 1 loads directly after Play tap"
+    test_loci:
+      - describe: "StartScreen — session routing"
+        file: "tests/game/mars-bounce/screens/startScreen.test.ts"
+        cases:
+          - "Play button is visible and centred; settings icon is in top-right corner (≥ 44 pt)"
+          - "audio is unlocked, GPU is initialised, and first-time-intro sequence starts"
+          - "audio is unlocked, GPU is initialised, and Level 1 loads directly"
+          - "2-panel intro shows: panel 1 'They need your help!', panel 2 'Tap matching aliens to launch them home.'"
+          - "Level 1 Gameplay Screen loads"
+          - "intro screens are not shown; Level 1 loads directly after Play tap"
+      - describe: "LoadingScreen — Mars theme"
+        file: "tests/game/mars-bounce/screens/loadingScreen.test.ts"
+        cases:
+          - "loading screen shows Mars landscape background and animated progress bar (not green spinner)"
+    files:
+      state:
+        - "src/game/mars-bounce/screens/startView.ts"
+      integration:
+        - "src/game/screens/LoadingScreen.tsx"
+        - "src/game/screens/StartScreen.tsx"
+        - "src/game/mars-bounce/screens/startView.ts"
+      test:
+        - "tests/game/mars-bounce/screens/startScreen.test.ts"
+        - "tests/game/mars-bounce/screens/loadingScreen.test.ts"
+    how:
+      - "Update LoadingScreen.tsx: replace green spinner with Mars landscape (emoji/text fallback until atlas available), animated progress bar (CSS transition on width%, triggered by progress signal)."
+      - "Update StartScreen.tsx + startView.ts: Mars-themed Play button (centered), settings icon (top-right, 44 pt). On Play tap: call unlockAudio() first, then GPU init + level load. Check localStorage 'mars-bounce-firstSeen'; if absent → show intro; if present → skip."
+      - "Add 2-panel first-time-intro to startView.ts: DOM panels with Mars illustration (emoji fallback), tap-to-advance. After panel 2 tap: set localStorage 'mars-bounce-firstSeen', goto('game')."
+    risk: MEDIUM
+    risk_reason: |
+      Title screen wires GPU init and audio unlock — ordering matters (audio must unlock before
+      first play). First-session localStorage check must work on iOS Safari. Verify: audio plays
+      on first tap; intro shown exactly once; returning player skips intro correctly.
+    definition_of_done:
+      - "acceptance[] tests go red then green"
+      - "loading screen has Mars theme (not green spinner)"
+      - "Play tap unlocks audio before GPU init"
+      - "first-time intro shown on fresh session, skipped on return"
+      - "CoS sub-walk: canvas — Play button and settings icon visible, no overlap; core-interaction — settings icon ≥ 44 pt"
+      - "bun run build and bun run test:run pass within 3 fix cycles"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BATCH 9: Chapter Complete Screen
+  # P2 — polish/milestone; game is complete without it.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: 9
+    name: "Chapter Complete Screen — milestone interstitial"
+    priority: P2
+    player_visible: |
+      When level N is a multiple of 10 (chapter boundary), the Chapter Complete
+      interstitial slides up: animated Mars panorama + confetti, chapter number,
+      total chapter score, 'Keep Going!' button. Keep Going → Title Screen.
+    features:
+      - chapter-complete-screen
+    cos_covered:
+      - animated-dynamics
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [keep-going-btn]
+      feedback_surfaces: [dom-overlay, background-animation]
+    acceptance:
+      - given: "player completes level 10 (level % 10 == 0)"
+        should: "Chapter Complete Screen appears instead of standard Level Complete screen"
+      - given: "Chapter Complete Screen is visible"
+        should: "chapter number and cumulative chapter score are displayed"
+      - given: "Keep Going! button is tapped"
+        should: "screen transitions to Title Screen; chapter score is reset for next chapter"
+    test_loci:
+      - describe: "GameController — chapter boundary routing"
+        file: "tests/game/mars-bounce/GameController.test.ts"
+        cases:
+          - "Chapter Complete Screen appears instead of standard Level Complete screen"
+          - "chapter number and cumulative chapter score are displayed"
+          - "screen transitions to Title Screen; chapter score is reset for next chapter"
+    files:
+      state:
+        - "src/game/mars-bounce/state/MarsBouncePlugin.ts"
+      integration:
+        - "src/game/screens/ResultsScreen.tsx"
+        - "src/game/mars-bounce/screens/gameController.ts"
+      test:
+        - "tests/game/mars-bounce/GameController.test.ts"
+    how:
+      - "Add chapterScore resource to MarsBouncePlugin. On level complete: add levelScore to chapterScore. GameController checks level % 10 == 0 → route to chapter-complete branch of ResultsScreen."
+      - "Add chapter-complete branch to ResultsScreen.tsx: animated Mars panorama (CSS keyframe or emoji fallback), confetti (GSAP stagger), chapter/score display, 'Keep Going!' button navigates to 'start' screen."
+      - "On Keep Going: reset chapterScore to 0 in ECS transactions."
+    risk: MEDIUM
+    risk_reason: |
+      New screen branch. Chapter score resource must be initialised before level 1.
+      Verify: chapter boundary triggers at exactly level 10, 20, 30 etc.;
+      Keep Going routes to start screen without a game-state leak.
+    definition_of_done:
+      - "acceptance[] tests go red then green"
+      - "chapter complete fires at level 10, 20, 30"
+      - "chapter score accumulated and reset correctly"
+      - "Keep Going navigates to title without game state leak"
+      - "bun run build and bun run test:run pass within 3 fix cycles"

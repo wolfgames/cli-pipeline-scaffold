@@ -1,0 +1,73 @@
+aliases:
+  runDir: "/Users/eronsalling/Developer/WolfGamesWork/Wolfra/agent-worker/workspace/cli-pipeline-scaffold/pipeline/runs/run-01"
+  pass: "core"
+  skillRoot: "/Users/eronsalling/Developer/WolfGamesWork/Wolfra/agent-worker/workspace/cli-pipeline-scaffold/.claude/skills/pipeline-build-game"
+  repoRoot: "/Users/eronsalling/Developer/WolfGamesWork/Wolfra/agent-worker/workspace/cli-pipeline-scaffold"
+  rules: "/Users/eronsalling/Developer/WolfGamesWork/Wolfra/agent-worker/workspace/cli-pipeline-scaffold/.claude/rules"
+  tsRunner: "bun"
+  previousRunLog: null
+  buildCmd: "bun run build"
+  testCmd: "bun run test:run"
+
+# Written by 10-prime — mirrors $runLog.pass
+pass: "core"
+# Written by 10-prime — mirrors $phaseSummary.pass_gate.previous_pass_stable
+previous_pass_stable: null
+
+stack:
+  renderer: "pixi"
+  ui: "solidjs"
+  bundler: "vite"
+  runtime: "bun"
+  testing: "vitest"
+  animation: "gsap"
+  build_cmd: "bun run build"
+  test_cmd: "bun run test:run"
+  summary: "pixi + solidjs + gsap + bun (vite, vitest)"
+
+paths:
+  tests: "tests/"
+  modules: "src/modules/"
+  core: "src/core/"
+  game: "src/game/"
+  docs: "docs/"
+
+existing-features:
+  - "game screen shell (DOM mode placeholder — gameController.ts)"
+  - "start screen shell (DOM mode placeholder — startView.ts)"
+  - "screen flow (loading → start → game → results)"
+  - "asset coordinator (layered DOM/GPU/audio loading)"
+  - "audio system (Howler — music, SFX, volume, mute)"
+  - "pause overlay"
+  - "analytics (PostHog via game-kit)"
+  - "error tracking (Sentry)"
+  - "live tuning (Tweakpane)"
+  - "wolf games branding logo (bottom center, DOM overlay)"
+
+dom-overlays:
+  - element: WolfGamesLogo
+    file: src/game/screens/GameScreen.tsx
+    position: bottom
+    height-px: 64
+    css: "absolute bottom-8 left-1/2 -translate-x-1/2"
+
+# viewport-budget is owned by 30-plan (run-context-ownership.md)
+viewport-budget:
+  hud_px: 60
+  board_cell_px: 55
+  board_cols: 7
+  board_rows: 9
+  board_width_px: 385
+  board_height_px: 495
+  margin_above_board_px: 8
+  margin_below_board_px: 8
+  dom_reserved_bottom_px: 64
+  dom_reserved_top_px: 0
+  total_px: 635
+  available_px: 844
+  spare_px: 209
+  board_fraction: 0.587
+  touch_target_min_px: 44
+  touch_target_check: "PASS"
+  tile_cap_check: "PASS"
+  derived_from: "greenfield_defaults"

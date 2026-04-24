@@ -60,5 +60,23 @@ export const manifest: Manifest = {
     //   { name: 'fx-blast', assets: [{ alias: 'fx-blast', src: 'vfx-blast.json' }] },
     //   { name: 'audio-sfx-mygame', assets: [{ alias: 'audio-sfx-mygame', src: 'sfx-mygame.json' }] },
     //   { name: 'audio-music-mygame', assets: [{ alias: 'audio-music-mygame', src: 'music-mygame.json' }] },
+
+    // Mars Bounce — GPU spritesheet (aliens, planets, combo pieces, HUD icons)
+    {
+      name: 'scene-mars-bounce',
+      assets: [{ alias: 'scene-mars-bounce', src: 'atlas-mars-bounce.json' }],
+    },
+
+    // Mars Bounce — audio SFX
+    {
+      name: 'audio-sfx-mars-bounce',
+      assets: [{ alias: 'audio-sfx-mars-bounce', src: 'sfx-mars-bounce.json' }],
+    },
+
+    // Mars Bounce — music
+    {
+      name: 'audio-music-mars-bounce',
+      assets: [{ alias: 'audio-music-mars-bounce', src: 'music-mars-bounce.json' }],
+    },
   ],
 };
