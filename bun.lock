@@ -8,7 +8,7 @@
         "@sentry/solid": "^10.38.0",
         "@wolfgames/components": "^0.1.14",
         "@wolfgames/cortex": "^0.1.2",
-        "@wolfgames/game-kit": "^0.0.46",
+        "@wolfgames/game-kit": "^0.0.54",
         "arktype": "^2.1.27",
         "gsap": "^3.14.2",
         "howler": "^2.2.4",
@@ -576,7 +576,7 @@
 
     "@wolfgames/cortex": ["@wolfgames/cortex@0.1.2", "https://npm.pkg.github.com/download/@wolfgames/cortex/0.1.2/0b28b70869b468c55ace37b9caab87096edbe077", {}, "sha512-o2imauEOltA1VzGDD2TEI3duR/uUcoI0Wv8z8fvbVV4zmjCWwMiXDz52J0FyT9Zs4Go8oQjhVzBWZsOBmoI5jQ=="],
 
-    "@wolfgames/game-kit": ["@wolfgames/game-kit@0.0.46", "https://npm.pkg.github.com/download/@wolfgames/game-kit/0.0.46/60091e2ad486bb4cddcadfb69e7a87b630b8d051", { "dependencies": { "@inquirer/prompts": "^7.10.1", "@modelcontextprotocol/sdk": "^1.26.0", "@sentry/browser": "^10.38.0", "arktype": "^2.1.29", "chalk": "^5.6.2", "commander": "^14.0.3", "execa": "^9.6.1", "mime-types": "^3.0.2", "open": "^10.2.0", "ora": "^9.3.0" }, "peerDependencies": { "@ffmpeg-installer/ffmpeg": "^1.1.0", "@nestjs/common": "^10.0.0 || ^11.0.0", "@nestjs/core": "^10.0.0 || ^11.0.0", "@typescript-eslint/eslint-plugin": "^8.0.0", "@typescript-eslint/parser": "^8.0.0", "class-transformer": "^0.5.1", "class-validator": "^0.14.0", "eslint": "^9.0.0", "fluent-ffmpeg": "^2.1.3", "posthog-js": "^1.0.0", "prettier": "^3.0.0", "rxjs": "^7.8.1", "sharp": "^0.34.5", "typescript": "^5.9.3" }, "bin": { "game-kit": "bin/cli.js" } }, "sha512-SnSqISSMiNMzD53EFJPuqCcefmXHGbMcUK6XGjsdI9uvf4UazAhkClza+dD6VHrhIKcMMIyD/+UAkALh1GTqyg=="],
+    "@wolfgames/game-kit": ["@wolfgames/game-kit@0.0.54", "https://npm.pkg.github.com/download/@wolfgames/game-kit/0.0.54/17467806e3c3c64866dbf08f7a9a813d6910418c", { "dependencies": { "@inquirer/prompts": "^7.10.1", "@modelcontextprotocol/sdk": "^1.26.0", "@sentry/browser": "^10.38.0", "arktype": "^2.1.29", "chalk": "^5.6.2", "commander": "^14.0.3", "execa": "^9.6.1", "mime-types": "^3.0.2", "open": "^10.2.0", "ora": "^9.3.0", "uuid": "^13.0.0" }, "peerDependencies": { "@ffmpeg-installer/ffmpeg": "^1.1.0", "@nestjs/common": "^10.0.0 || ^11.0.0", "@nestjs/core": "^10.0.0 || ^11.0.0", "@typescript-eslint/eslint-plugin": "^8.0.0", "@typescript-eslint/parser": "^8.0.0", "class-transformer": "^0.5.1", "class-validator": "^0.14.0", "eslint": "^9.0.0", "fluent-ffmpeg": "^2.1.3", "posthog-js": "^1.0.0", "prettier": "^3.0.0", "rxjs": "^7.8.1", "sharp": "^0.34.5", "typescript": "^5.9.3" }, "bin": { "game-kit": "bin/cli.js" } }, "sha512-kl6+8R+ApUK1VrgP7DCxz39ZqwlRpbUsUemFBxXkX/iaY3HgymqyCKJbnNn7jUNPM2SAj98WwW290oTWigbj/w=="],
 
     "@wolfgames/semantic-router": ["@wolfgames/semantic-router@0.1.2", "https://npm.pkg.github.com/download/@wolfgames/semantic-router/0.1.2/da7338dff600b20102298987baa6536c2eda933e", { "dependencies": { "@orama/orama": "^3.1.18", "@orama/plugin-embeddings": "^3.1.18" } }, "sha512-W+tZI/EBMItkuuVKxImGctDrJ5K34v2EdyF2p69fZPBVJ8U0HWStXC3+HCg32IbCNikx+iRr/uuzdxyRcAnT+w=="],
 
@@ -1335,6 +1335,8 @@
     "uri-js": ["uri-js@4.4.1", "", { "dependencies": { "punycode": "^2.1.0" } }, "sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg=="],
 
     "util-deprecate": ["util-deprecate@1.0.2", "", {}, "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw=="],
+
+    "uuid": ["uuid@13.0.0", "", { "bin": { "uuid": "dist-node/bin/uuid" } }, "sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w=="],
 
     "validator": ["validator@13.15.35", "", {}, "sha512-TQ5pAGhd5whStmqWvYF4OjQROlmv9SMFVt37qoCBdqRffuuklWYQlCNnEs2ZaIBD1kZRNnikiZOS1eqgkar0iw=="],
 

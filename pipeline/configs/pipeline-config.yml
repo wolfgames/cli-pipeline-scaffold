@@ -1,0 +1,41 @@
+# Pipeline execution config — controls pipeline-build-game behavior.
+# Read by the pipeline at runtime. Committed to repo.
+
+# Target pass — the build pipeline runs exactly one named pass per invocation.
+#   core | secondary | meta | superfan
+# Override at the CLI with --pass <name>. The scaffold-only wrappers pass (pre)
+# is NOT accepted here — wrappers are produced once at project init.
+pass: core
+
+# Require previous pass — 05-pass-gate refuses to start pass N until pass N-1
+# has a run-log.yml with root status: complete. Set to false to skip the guard
+# (the CLI --allow-skip-pass flag also bypasses per-invocation).
+require-previous-pass: true
+
+# GDD gate — how to handle a thin or missing prompt before running phases.
+#   auto-handoff    : run pipeline-create-gdd in full-generation mode on the draft, then resume (default)
+#   suggest-confirm : pause, show gaps, ask the user whether to build the GDD, proceed anyway, or cancel
+#   proceed-warn    : log a WARNING in run-log.yml and proceed with the thin prompt
+gdd-gate: auto-handoff
+
+# Phase skip groups — disable entire categories of phases
+skip-groups: []
+# skip-groups: [tests, polish, assets]
+
+# Model override — force all phases to use a specific model
+# model: default
+# model: fast
+
+# Visual verification — start dev server + browser MCP screenshot check
+visual-verify: false
+
+# Think-only mode — skip write-mode phases, produce plans only
+think-only: false
+
+# Debug mode — log subagent instructions instead of executing
+debug: false
+
+# Trace mode — write per-phase trace files to runs/<NN>/traces/
+# Traces capture agent reasoning, decisions, and alternatives for human inspection.
+# When false, only structured YAML summaries are written.
+trace: false
