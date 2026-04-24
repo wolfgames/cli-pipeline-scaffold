@@ -50,6 +50,7 @@ function bundlesByPrefix(manifest: Manifest, prefix: string): string[] {
 }
 
 export interface AssetCoordinatorFacade {
+  loadingState(): LoadingState;
   loadingStateSignal: { get: () => LoadingState; set: (v: LoadingState) => void; subscribe: (fn: (v: LoadingState) => void) => () => void };
   ready: { get: () => boolean; set: (v: boolean) => void; subscribe: (fn: (v: boolean) => void) => () => void };
   gpuReady: { get: () => boolean; set: (v: boolean) => void; subscribe: (fn: (v: boolean) => void) => () => void };
@@ -66,6 +67,7 @@ export interface AssetCoordinatorFacade {
   loadAudio(onProgress?: ProgressCallback): Promise<void>;
   loadScene(name: string, onProgress?: ProgressCallback): Promise<void>;
   initGpu(): Promise<void>;
+  getGpuLoader(): PixiLoader | null;
   unloadBundle(name: string): void;
   unloadBundles(names: string[]): void;
   unloadScene(sceneName: string): void;
@@ -76,6 +78,7 @@ export interface AssetCoordinatorFacade {
     unlock(): Promise<void>;
   };
   getLoader<T = unknown>(type: LoaderType): T | null;
+  dispose(): void;
 }
 
 export function createCoordinatorFacade(manifest: Manifest): AssetCoordinatorFacade {
@@ -138,16 +141,20 @@ export function createCoordinatorFacade(manifest: Manifest): AssetCoordinatorFac
   };
 
   let gpuInit: Promise<void> | null = null;
+  let gpuLoader: PixiLoader | null = null;
 
   const initGpu = () => {
     if (!gpuInit) {
       gpuInit = (async () => {
-        coordinator.initLoader('gpu', createPixiLoader());
+        gpuLoader = createPixiLoader();
+        coordinator.initLoader('gpu', gpuLoader);
         gpuReadySignal.set(true);
       })();
     }
     return gpuInit;
   };
+
+  const getGpuLoader = (): PixiLoader | null => gpuLoader;
 
   const unloadBundle = (name: string) => {
     const type = getLoaderTypeForBundle(name, manifest);
@@ -186,6 +193,7 @@ export function createCoordinatorFacade(manifest: Manifest): AssetCoordinatorFac
   };
 
   return {
+    loadingState: () => coordinator.loadingState.get(),
     loadingStateSignal: coordinator.loadingState,
     ready: readySignal,
     gpuReady: gpuReadySignal,
@@ -204,6 +212,7 @@ export function createCoordinatorFacade(manifest: Manifest): AssetCoordinatorFac
     loadScene,
 
     initGpu,
+    getGpuLoader,
     unloadBundle,
     unloadBundles,
     unloadScene,
@@ -227,5 +236,11 @@ export function createCoordinatorFacade(manifest: Manifest): AssetCoordinatorFac
     },
 
     getLoader: <T>(type: LoaderType) => coordinator.getLoader(type) as T | null,
+
+    dispose(): void {
+      howlerLoader.dispose();
+      domLoader.dispose();
+      gpuLoader?.dispose();
+    },
   };
 }

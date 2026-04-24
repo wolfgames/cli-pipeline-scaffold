@@ -197,3 +197,28 @@ integrate:
       - "src/game/mars-bounce/renderers/BlockRenderer.ts:emojiForSpecies — not wired into rendering path; must feed into Pixi Text nodes as fallback when atlas absent (visual pass)"
       - "src/game/mars-bounce/renderers/BoardRenderer.ts:showDirectionOverlay — empty body, wired by TapHandler; implementing rocket ghost overlay requires new Pixi render logic (visual pass)"
       - "src/game/mars-bounce/renderers/BoardRenderer.ts:hideDirectionOverlay — empty body, wired by TapHandler; implementing requires same Pixi overlay logic (visual pass)"
+
+verify:
+  status: complete
+  build_status: PASS
+  test_counts:
+    total: 193
+    passing: 193
+    failing: 0
+    preexisting_infra_failures: 4
+  fix_cycles: 1
+  playability_result: skipped
+  visual_verification: skipped
+  remaining_issues:
+    - "4 pre-existing infra test files use bun:test module incompatible with vitest runner (scaffold-e2e, scaffold-sync, scaffold-release, import-boundary) — 0 tests execute, 0 assertions affected"
+    - "alien-sprites-invisible: BlockRenderer uses Texture.EMPTY — board renders as empty sprites; deferred to visual pass"
+    - "animation-stubs: playEvent resolves immediately — no visual animation; deferred to visual pass"
+    - "results screen theme drift: generic space palette vs Mars-red; deferred to visual pass"
+  carry_forward:
+    browser_verified: false
+    unwinnable: false
+    perf_flags: []
+    mobile_viewport_check: "PASS — no 100vh in game code; core uses 100vh in upstream scaffold only"
+    mobile_touch_check: "PASS — touch-action:none + user-select:none on Pixi canvas in gameController.ts"
+    mobile_dpr_cap: "PASS — Math.min(devicePixelRatio, 2) in gameController.ts"
+    test_fix_summary: "Fixed createDomLoader missing from @wolfgames/components/core mock in facade.test.ts and facade-unload.test.ts; added missing facade methods: loadingState(), getGpuLoader(), dispose() to AssetCoordinatorFacade"

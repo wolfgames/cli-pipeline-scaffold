@@ -18,31 +18,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@wolfgames/components/core', () => {
-  const createAssetFacade = vi.fn(({ loaders }: { loaders?: Record<string, unknown> }) => {
+  const createDomLoader = vi.fn(() => ({
+    init: vi.fn(),
+    loadBundle: vi.fn(async () => {}),
+    get: vi.fn(() => null),
+    getImage: vi.fn(() => null),
+    getSheet: vi.fn(() => null),
+    getSpritesheet: vi.fn(() => null),
+    has: vi.fn(() => false),
+    unloadBundle: vi.fn(),
+    dispose: vi.fn(),
+  }));
+
+  const createAssetCoordinator = vi.fn(({ loaders }: { loaders?: Record<string, unknown> }) => {
     const loaded = new Set<string>();
     const unloaded = new Set<string>();
-    return {
-      loadBundle: vi.fn(async (name: string) => { loaded.add(name); unloaded.delete(name); }),
-      loadBundles: vi.fn(async (names: string[]) => { for (const n of names) { loaded.add(n); unloaded.delete(n); } }),
-      backgroundLoadBundle: vi.fn(async () => {}),
-      preloadScene: vi.fn(async () => {}),
-      loadBoot: vi.fn(async () => { loaded.add('boot-splash'); }),
-      loadCore: vi.fn(async () => { loaded.add('core-ui'); }),
-      loadTheme: vi.fn(async () => { loaded.add('theme-branding'); }),
-      loadAudio: vi.fn(async () => { loaded.add('audio-sfx'); }),
-      loadScene: vi.fn(async (name: string) => { loaded.add(`scene-${name}`); }),
-      initGpu: vi.fn(async () => {}),
-      getLoadedBundles: vi.fn(() => [...loaded]),
-      isLoaded: vi.fn((name: string) => loaded.has(name)),
-      unloadBundle: vi.fn((name: string) => { loaded.delete(name); unloaded.add(name); }),
-      unloadBundles: vi.fn((names: string[]) => { for (const n of names) { loaded.delete(n); unloaded.add(n); } }),
-      unloadScene: vi.fn((sceneName: string) => {
-        const name = `scene-${sceneName}`;
-        loaded.delete(name);
-        unloaded.add(name);
-      }),
-      startBackgroundLoading: vi.fn(async () => {}),
-      loadingState: vi.fn(() => ({
+
+    const loadingStateSignal = {
+      get: vi.fn(() => ({
         loading: [],
         loaded: [...loaded],
         backgroundLoading: [],
@@ -51,40 +44,56 @@ vi.mock('@wolfgames/components/core', () => {
         bundleProgress: {},
         progress: 0,
       })),
-      loadingStateSignal: {
-        get: vi.fn(() => ({
-          loading: [],
-          loaded: [...loaded],
-          backgroundLoading: [],
-          unloaded: [...unloaded],
-          errors: {},
-          bundleProgress: {},
-          progress: 0,
-        })),
-        set: vi.fn(),
-        subscribe: vi.fn(() => () => {}),
-      },
-      ready: { get: vi.fn(() => false), set: vi.fn(), subscribe: vi.fn(() => () => {}) },
-      gpuReady: { get: vi.fn(() => false), set: vi.fn(), subscribe: vi.fn(() => () => {}) },
-      dom: {
-        getFrameURL: vi.fn(async () => 'blob:mock'),
-        get: vi.fn(() => null),
-        getImage: vi.fn(() => null),
-        getSheet: vi.fn(() => null),
-        getSpritesheet: vi.fn(() => null),
-      },
-      getLoader: vi.fn(() => null),
+      set: vi.fn(),
+      subscribe: vi.fn(() => () => {}),
+    };
+
+    // Shared loader that modifies the loaded/unloaded sets — used by getLoader
+    const sharedLoader = {
+      init: vi.fn(),
+      loadBundle: vi.fn(async (name: string) => { loaded.add(name); unloaded.delete(name); }),
+      get: vi.fn(() => null),
+      has: vi.fn(() => false),
+      unloadBundle: vi.fn((name: string) => { loaded.delete(name); unloaded.add(name); }),
       dispose: vi.fn(),
-      coordinator: {},
+    };
+
+    return {
+      loadBundle: vi.fn(async (name: string) => { loaded.add(name); unloaded.delete(name); }),
+      loadBundles: vi.fn(async (names: string[]) => { for (const n of names) { loaded.add(n); unloaded.delete(n); } }),
+      backgroundLoadBundle: vi.fn(async () => {}),
+      initLoader: vi.fn(),
+      getLoadedBundles: vi.fn(() => [...loaded]),
+      isLoaded: vi.fn((name: string) => loaded.has(name)),
+      unloadBundle: vi.fn((name: string) => { loaded.delete(name); unloaded.add(name); }),
+      unloadBundles: vi.fn((names: string[]) => { for (const n of names) { loaded.delete(n); unloaded.add(n); } }),
+      startBackgroundLoading: vi.fn(async () => {}),
+      loadingState: loadingStateSignal,
+      getLoader: vi.fn((_type: string) => sharedLoader),
+      dispose: vi.fn(),
       _loaders: loaders,
       _loaded: loaded,
       _unloaded: unloaded,
     };
   });
 
+  const createSignal = vi.fn((initial: unknown) => {
+    let value = initial;
+    return {
+      get: vi.fn(() => value),
+      set: vi.fn((v: unknown) => { value = v; }),
+      subscribe: vi.fn(() => () => {}),
+    };
+  });
+
   return {
-    createAssetFacade,
+    createAssetCoordinator,
+    createAssetFacade: vi.fn(),
+    createDomLoader,
+    createSignal,
     validateManifest: vi.fn(() => ({ valid: true, errors: [] })),
+    KIND_TO_PREFIX: { boot: 'boot-', theme: 'theme-', audio: 'audio-', data: 'data-', core: 'core-', scene: 'scene-', fx: 'fx-' },
+    KIND_TO_LOADER: { boot: 'dom', theme: 'dom', audio: 'audio', data: 'dom', core: 'gpu', scene: 'gpu', fx: 'gpu' },
   };
 });
 
