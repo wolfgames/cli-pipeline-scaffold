@@ -17,12 +17,17 @@ export interface GameState {
   setLevel: (level: number) => void;
   incrementLevel: () => void;
 
+  /** Last game result — 'win' | 'loss'. Set by bridgeEcsToSignals before navigation. */
+  lastResult: () => 'win' | 'loss' | null;
+  setLastResult: (result: 'win' | 'loss' | null) => void;
+
   reset: () => void;
 }
 
 function createGameState(): GameState {
   const [score, setScore] = createSignal(0);
   const [level, setLevel] = createSignal(1);
+  const [lastResult, setLastResult] = createSignal<'win' | 'loss' | null>(null);
 
   return {
     score,
@@ -33,9 +38,13 @@ function createGameState(): GameState {
     setLevel,
     incrementLevel: () => setLevel((l) => l + 1),
 
+    lastResult,
+    setLastResult,
+
     reset: () => {
       setScore(0);
       setLevel(1);
+      setLastResult(null);
     },
   };
 }

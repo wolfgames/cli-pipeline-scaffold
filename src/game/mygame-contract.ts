@@ -37,6 +37,8 @@ export interface GameControllerDeps {
   audio: unknown;
   gameData: unknown;
   analytics: unknown;
+  /** Navigate to a screen — provided by GameScreen.tsx from useScreen(). */
+  goto?: (screen: string) => void;
 }
 
 export interface GameController {

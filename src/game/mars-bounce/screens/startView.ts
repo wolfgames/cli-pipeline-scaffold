@@ -50,12 +50,11 @@ export function createStartView(): StartView {
   };
 
   const startPlay = (goto: (screen: string) => void): void => {
-    if (isFirstSession()) {
-      // First session: signal 'intro' to caller — caller renders panels
-      goto('intro');
-    } else {
+    if (!isFirstSession()) {
+      // Returning session: go directly to game
       goto('game');
     }
+    // First session: caller checks isFirstSession() and renders intro inline
   };
 
   const advanceIntro = (panelIndex: number, goto: (screen: string) => void): void => {

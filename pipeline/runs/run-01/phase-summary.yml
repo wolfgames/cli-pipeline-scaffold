@@ -149,3 +149,51 @@ implement:
     animation_gsap_integration: "playEvent stub in gameController; real GSAP tweens deferred to visual pass"
     sprite_atlas_integration: "emoji fallbacks used throughout; atlas sprites deferred to asset pass"
     audio_integration: "audio hooks present in deps; sound playback deferred to audio pass"
+
+player_flow:
+  status: complete
+  journey_walked: true
+  transitions_checked:
+    - loading_to_start
+    - start_to_game
+    - game_to_results_win
+    - game_to_results_loss
+    - results_to_game_next_level
+    - results_to_start_keep_going
+    - game_to_results_chapter_complete
+  fun_test_result: fail
+  issues_found: 6
+  fixes_applied: 5
+  carry_forward:
+    journey_breaks:
+      - "continue_btn: board-state not preserved on goto('game') — activeDb null after game-screen unmount (core-pass stub limitation)"
+    fun_test_failed_features:
+      - "alien-sprites-invisible: BlockRenderer uses Texture.EMPTY — entire board appears black; no visual feedback per tap (deferred to visual pass)"
+      - "animation-stubs: playEvent resolves immediately — no visual animation on cluster clear, gravity, or combo activation"
+    difficulty_mismatch: []
+    theme_drift:
+      - "results: bg-gradient-to-b from-slate-900 to-black is generic space, not Mars-red palette used on other screens"
+    cos_still_failing: []
+
+integrate:
+  status: complete
+  viewport_rederived: false
+  orphans_wired:
+    - "src/game/mars-bounce/screens/startView.ts:startPlay — removed invalid goto('intro') call; returning-player path unaffected; first-session caller already invokes renderIntro() inline"
+  orphans_deleted: []
+  fallbacks_unified:
+    - "DOM screens (LoadingScreen, StartScreen, ResultsScreen): emoji text with aria labels — consistent across all 3 screens"
+    - "GPU layer (BlockRenderer): Texture.EMPTY sprites currently uncalled in game loop; emojiForSpecies() defined but not wired to rendering path — deferred to visual pass per implement.carry_forward.sprite_atlas_integration"
+  unreachable: []
+  warnings:
+    - "BlockRenderer.createAlienSprite/createCellSprite use Texture.EMPTY as atlas fallback — renders invisible on GPU when wired; must switch to emoji Text fallback (per design-smells fallbackPriority) in visual pass before first playtest"
+  carry_forward:
+    viewport_budget_recomputed_total: null
+    asset_fallbacks_unified_style: "emoji"
+    unreachable_blocks_playability: false
+    orphan_wiring_blocked:
+      - "src/game/mars-bounce/renderers/BlockRenderer.ts:createAlienSprite — not called in game loop; wiring requires GSAP board sync + sprite pool management (visual pass)"
+      - "src/game/mars-bounce/renderers/BlockRenderer.ts:createCellSprite — not called in game loop; wiring requires GSAP board sync + sprite pool management (visual pass)"
+      - "src/game/mars-bounce/renderers/BlockRenderer.ts:emojiForSpecies — not wired into rendering path; must feed into Pixi Text nodes as fallback when atlas absent (visual pass)"
+      - "src/game/mars-bounce/renderers/BoardRenderer.ts:showDirectionOverlay — empty body, wired by TapHandler; implementing rocket ghost overlay requires new Pixi render logic (visual pass)"
+      - "src/game/mars-bounce/renderers/BoardRenderer.ts:hideDirectionOverlay — empty body, wired by TapHandler; implementing requires same Pixi overlay logic (visual pass)"

@@ -45,10 +45,13 @@ export function ResultsScreen(props: ResultsScreenProps) {
   const { goto } = useScreen();
   const score = gameState.score();
 
-  // Resolve result branch
-  const result = props.result ?? 'win';
-  const isChapterComplete = result === 'chapter-complete';
-  const isWin = result === 'win';
+  // Resolve result branch — prefer explicit prop, then persisted lastResult signal, then default to 'win'
+  const lastResult = gameState.lastResult();
+  const result = props.result ?? (lastResult === 'loss' ? 'loss' : 'win');
+  // Chapter complete: level % 10 === 0 and it's a win (level() is the level just completed)
+  const currentLevel = gameState.level();
+  const isChapterComplete = result === 'chapter-complete' || (result === 'win' && currentLevel % 10 === 0 && currentLevel > 0);
+  const isWin = result === 'win' && !isChapterComplete;
 
   const handleNextLevel = () => {
     gameState.incrementLevel();

@@ -22,8 +22,9 @@ import { TapHandler } from '../input/TapHandler';
 import { HudRenderer } from '../renderers/HudRenderer';
 import { AnimationPlayer } from '../animation/AnimationPlayer';
 import { LevelGenerator } from '../level/LevelGenerator';
+import { gameState } from '~/game/state';
 
-export const setupGame: SetupGame = (_deps: GameControllerDeps): GameController => {
+export const setupGame: SetupGame = (deps: GameControllerDeps): GameController => {
   const [ariaText, setAriaText] = createSignal('Mars Bounce loading…');
 
   let app: Application | null = null;
@@ -53,7 +54,7 @@ export const setupGame: SetupGame = (_deps: GameControllerDeps): GameController 
       // 1. ECS setup
       const db = createMarsBounceDb();
       setActiveDb(db as any);
-      cleanupBridge = bridgeEcsToSignals(db);
+      cleanupBridge = bridgeEcsToSignals(db, { goto: deps.goto });
 
       // 2. Pixi Application
       app = new Application();
@@ -112,11 +113,12 @@ export const setupGame: SetupGame = (_deps: GameControllerDeps): GameController 
         db.observe.resources.level((v) => hudRenderer.updateLevel(v)),
       ];
 
-      // 7. Load level 1 from seeded generator
+      // 7. Load current level from seeded generator (use gameState.level() to persist across screens)
       const levelGenerator = new LevelGenerator();
-      const levelData = levelGenerator.generate({ levelNumber: db.resources.level });
+      const currentLevel = gameState.level();
+      const levelData = levelGenerator.generate({ levelNumber: currentLevel });
       db.transactions.initLevel({
-        level: db.resources.level,
+        level: currentLevel,
         movesRemaining: levelData.movesRemaining,
         activeSpecies: levelData.activeSpecies,
         cells: levelData.cells as Parameters<typeof db.transactions.initLevel>[1]['cells'],
