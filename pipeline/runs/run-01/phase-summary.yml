@@ -222,3 +222,44 @@ verify:
     mobile_touch_check: "PASS — touch-action:none + user-select:none on Pixi canvas in gameController.ts"
     mobile_dpr_cap: "PASS — Math.min(devicePixelRatio, 2) in gameController.ts"
     test_fix_summary: "Fixed createDomLoader missing from @wolfgames/components/core mock in facade.test.ts and facade-unload.test.ts; added missing facade methods: loadingState(), getGpuLoader(), dispose() to AssetCoordinatorFacade"
+
+stabilize:
+  status: complete
+  pipeline_status: partial
+  completion_ratio: "13/17 completeness items met; 4 gaps"
+  test_count: 199
+  cos_walk:
+    core-interaction: partial
+    canvas: partial
+    animated-dynamics: partial
+    scoring: pass
+  cos_failed: []
+  cos_rationale:
+    core-interaction: "Primary tap mechanic, pointer events, invalid-tap shake, and input gate all pass exit criteria; showDirectionOverlay/hideDirectionOverlay are empty body stubs — Rocket Alien direction ghost overlay is not rendered (deferred to visual pass per integrate.carry_forward)"
+    canvas: "Viewport geometry passes: 55 px cells, 7×9 board, HUD no-overlap confirmed; exit criterion 'theme visible at a glance' fails — BlockRenderer uses Texture.EMPTY so board renders invisible (deferred to visual pass per implement.carry_forward.sprite_atlas_integration)"
+    animated-dynamics: "Event queue architecture, stable entity IDs, board-diff, and input gate all implemented and tested; playEvent is a stub resolving immediately so no GSAP animations play; cascade escalation (speed/bounce/intensity scaling) not implemented (both deferred to visual pass per implement.carry_forward.animation_gsap_integration)"
+  completeness_gaps:
+    - "piece-visual-style-locked: Texture.EMPTY atlas fallback — board invisible; emoji Text fallback or real atlas required before playtest"
+    - "cascade-escalation: speed/bounce/intensity scaling with depth not implemented"
+    - "score-popup-animation: per-clear popup at clear location not implemented"
+    - "mobile-60fps-verified: browser_verified: false — no mobile playtest this run"
+  build_status: PASS
+  test_status: PASS
+  fix_cycles_used: 0
+  notes: >
+    mergeStatus([partial, partial, partial, complete], build=complete, tests=complete) = partial.
+    cos_failed is empty (all three partial CoS are deferred to visual pass, not blocking);
+    completeness_gaps non-empty → pipeline_status: partial per stabilize dispatch rules.
+    Edge-case tests added: 6 new tests (cascade scoring multiplier, invalid-tap-only queue,
+    Rocket cancel, level-15 profile, Bounce Planet path clear, combo Win transition).
+    Build: 0 errors. Tests: 199 passing / 0 failing (4 pre-existing infra excluded).
+  carry_forward:
+    next_pass_ready: false
+    unresolved_for_next_pass:
+      - "sprite-atlas-integration: emoji Text fallback or scene-mars-bounce atlas required"
+      - "gsap-playevent: playEvent stub must be replaced with real GSAP tweens"
+      - "cascade-escalation: speed/bounce/intensity scaling not implemented"
+      - "direction-overlay: showDirectionOverlay/hideDirectionOverlay empty stubs"
+      - "score-popup-animation: per-clear score popup not implemented"
+      - "mobile-60fps-verified: no browser playtest performed"
+    pass_stability: stable
