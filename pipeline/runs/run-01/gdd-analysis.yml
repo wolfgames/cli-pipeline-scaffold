@@ -1,0 +1,713 @@
+# gdd-analysis.yml — Structured feature delta
+# Written by phase 20 (analyze). Read by plan, implement, player-flow, stabilize.
+# Game: Mars Bounce — tap-to-clear cluster puzzle on a 7×9 Martian colony grid
+
+game: "Mars Bounce"
+counts:
+  exists: 6
+  partial: 1
+  new: 17
+  conflict: 0
+  content_gap: 4
+conflict_breakdown:
+  reuse: 0
+  adapt: 0
+  replace: 0
+high_risk: 7
+open_questions: 4
+
+features:
+
+  # ─── EXISTING (fully satisfied by scaffold) ────────────────────────────────
+
+  - id: asset-coordinator
+    name: "Asset coordinator (layered DOM/GPU/audio loading)"
+    status: exists
+    risk: LOW
+    complexity: low
+    lifecycle_phase: BOOT
+    cos_required: []
+    ux_zones: {}
+    affected_files: []
+    dependencies: []
+    notes: "Scaffold infra. Used as-is for bundle loading. No GDD delta."
+
+  - id: audio-system
+    name: "Audio system (Howler — music, SFX, volume, mute)"
+    status: exists
+    risk: LOW
+    complexity: low
+    cos_required: []
+    ux_zones: {}
+    affected_files: []
+    dependencies: []
+    notes: "Scaffold infra. GDD requires SFX for tap-clear, invalid tap, combo, bounce. Audio content is new (audio-* bundles) but the system itself is exists."
+
+  - id: pause-overlay
+    name: "Pause overlay"
+    status: exists
+    risk: LOW
+    complexity: low
+    lifecycle_phase: PLAY
+    cos_required: []
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [pause-button]
+      feedback_surfaces: [dom-overlay]
+    affected_files: []
+    dependencies: []
+    notes: "Scaffold pause system satisfies GDD 'Paused' board state. GDD adds pause button in HUD top-right — HUD is new (see feature hud)."
+
+  - id: analytics
+    name: "Analytics (PostHog)"
+    status: exists
+    risk: LOW
+    complexity: low
+    cos_required: []
+    ux_zones: {}
+    affected_files: []
+    dependencies: []
+    notes: "Scaffold infra. No GDD delta."
+
+  - id: error-tracking
+    name: "Error tracking (Sentry)"
+    status: exists
+    risk: LOW
+    complexity: low
+    cos_required: []
+    ux_zones: {}
+    affected_files: []
+    dependencies: []
+    notes: "Scaffold infra. No GDD delta."
+
+  - id: branding-logo
+    name: "Wolf Games branding logo (DOM overlay, bottom center)"
+    status: exists
+    risk: LOW
+    complexity: low
+    cos_required: []
+    ux_zones:
+      thumb_zone: center
+      touch_targets: []
+      feedback_surfaces: []
+    affected_files: []
+    dependencies: []
+    notes: "Scaffold DOM overlay. 64 px reserved bottom. No GDD delta."
+
+  # ─── PARTIAL ────────────────────────────────────────────────────────────────
+
+  - id: screen-flow
+    name: "Screen flow (loading → start → game → results)"
+    status: partial
+    risk: MEDIUM
+    complexity: med
+    lifecycle_phase: BOOT
+    cos_required: []
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [next-level-btn, try-again-btn, continue-btn, keep-going-btn]
+      feedback_surfaces: [dom-overlay]
+    affected_files:
+      - <game-root>/screens/gameController.ts
+      - <game-root>/screens/startView.ts
+      - src/game/screens/ResultsScreen.tsx
+      - src/game/screens/StartScreen.tsx
+    dependencies: [asset-coordinator]
+    ux:
+      discovery: "Screens appear sequentially; no discovery needed"
+      feedback: "Screen slide-in/out transitions per GDD sequences"
+      onboarding: "First-time intro is a separate feature (first-time-intro)"
+    notes: |
+      Scaffold has loading→start→game→results. GDD requires two additional branches:
+      1. Chapter Complete Screen (PROGRESSION interstitial — lifecycle.md wrapper: interstitial-screen)
+      2. Win/Loss split under 'results' screen ID (win-screen / loss-screen wrappers).
+      ResultsScreen is a generic placeholder; win and loss branches must be built.
+      Screen ID 'results' maps to both win and loss branches per lifecycle.md.
+      Missing: chapter-complete interstitial, win vs loss branching, first-time-intro.
+
+  # ─── CONTENT-GAP ────────────────────────────────────────────────────────────
+
+  - id: loading-screen-theme
+    name: "Loading Screen — Mars theme (progress bar, logo, Mars landscape)"
+    status: content-gap
+    risk: MEDIUM
+    complexity: med
+    lifecycle_phase: BOOT
+    cos_required: [canvas]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: []
+      feedback_surfaces: [progress-bar, background-illustration]
+    affected_files:
+      - src/game/screens/LoadingScreen.tsx
+    dependencies: [asset-coordinator]
+    ux:
+      discovery: "Passive; player sees Mars landscape and logo while assets load"
+      feedback: "Animated progress bar (≤3 s target)"
+      onboarding: "n/a — passive screen"
+    notes: |
+      LoadingScreen.tsx exists with generic green spinner on #BCE083 background.
+      GDD specifies: Mars landscape illustration, animated progress bar, game logo.
+      The infrastructure (bundle-loading logic, progress signal) is complete;
+      the visual identity is wrong. content-gap per phase constraint definition.
+
+  - id: title-screen-theme
+    name: "Title Screen — Mars theme (animated landscape, Play button, settings)"
+    status: content-gap
+    risk: HIGH
+    complexity: high
+    lifecycle_phase: TITLE
+    cos_required: [canvas, core-interaction]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [play-btn, settings-icon]
+      feedback_surfaces: [background-animation, play-btn]
+    affected_files:
+      - <game-root>/screens/startView.ts
+      - src/game/screens/StartScreen.tsx
+    dependencies: [asset-coordinator, audio-system]
+    ux:
+      discovery: "Play button prominently centered; settings icon top-right corner"
+      feedback: "Play button tap triggers GPU init + audio unlock + level load"
+      onboarding: "Returning player goes directly to current level; first-timer goes to first-time-intro"
+    notes: |
+      startView.ts shows generic DOM 'Start Screen' on #BCE083 with a basic Play button.
+      GDD requires: animated Mars landscape GPU scene, game title, Play button,
+      settings icon, first-session vs returning-player routing.
+      The screen flow infrastructure exists; visual content is wrong. HIGH risk because
+      title screen wires GPU init, audio unlock, and first-session routing — touches GameController.
+      CoS deferred to later passes: skill-curve (not applicable here).
+
+  - id: game-screen-shell-theme
+    name: "Gameplay Screen shell — Mars theme GPU canvas (replace DOM placeholder)"
+    status: content-gap
+    risk: HIGH
+    complexity: high
+    lifecycle_phase: PLAY
+    cos_required: [canvas, core-interaction, animated-dynamics, scoring]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [board-cells, combo-pieces]
+      feedback_surfaces: [gpu-canvas, hud]
+    affected_files:
+      - <game-root>/screens/gameController.ts
+    dependencies: [asset-coordinator, ecs-plugin]
+    ux:
+      discovery: "Board fills center of screen; alien clusters are visually distinct"
+      feedback: "All board events animated (no instant state changes)"
+      onboarding: "Level 1–3 constrained layout; first-time-intro precedes"
+    notes: |
+      gameController.ts creates a DOM div with 'Gameplay Screen' text.
+      GDD requires full GPU Pixi game with 7×9 board, alien sprites, animations.
+      This is the central integration point — every game feature flows through here.
+      Must switch from gameMode:'dom' to gameMode:'pixi'. HIGH risk per risk-rules.md
+      (touches GameController, modifies viewport layout logic, adds UI to viewport).
+
+  - id: results-screen-theme
+    name: "Results Screen — win/loss branches with Mars theme"
+    status: content-gap
+    risk: MEDIUM
+    complexity: med
+    lifecycle_phase: OUTCOME
+    cos_required: [animated-dynamics, scoring]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [next-level-btn, try-again-btn, continue-btn, main-menu-btn]
+      feedback_surfaces: [score-display, stars, celebration-animation]
+    affected_files:
+      - src/game/screens/ResultsScreen.tsx
+    dependencies: [screen-flow, ecs-plugin]
+    ux:
+      discovery: "Clear win/loss branch; celebration vs sad alien feedback"
+      feedback: "Win: celebration aliens + score tally animation. Loss: sad alien + move-count shake."
+      onboarding: "n/a — player has completed at least one level"
+    notes: |
+      ResultsScreen.tsx shows generic 'Game Over' with score and Play Again / Main Menu.
+      GDD requires separate win (Level Complete) and loss (Loss Screen) branches,
+      each with distinct animation sequences, themed content, and Continue option on loss.
+      Visual identity and branching logic are wrong. content-gap.
+
+  # ─── NEW ────────────────────────────────────────────────────────────────────
+
+  - id: ecs-plugin
+    name: "ECS plugin — Mars Bounce game state (board, entities, moves, score, phase)"
+    status: new
+    risk: HIGH
+    complexity: high
+    lifecycle_phase: PLAY
+    cos_required: [core-interaction, animated-dynamics, scoring]
+    ux_zones: {}
+    affected_files:
+      - <game-root>/state/MarsBouncePlugin.ts
+      - <game-root>/state/types.ts
+      - <game-root>/state/bridgeEcsToSignals.ts
+    dependencies: []
+    ux:
+      discovery: "n/a — pure state layer"
+      feedback: "n/a — consumed by renderers and animation queue"
+      onboarding: "n/a"
+    notes: |
+      ECS is the source of truth per ecs-state rules. Resources: boardState
+      (Idle|Animating|Won|Lost|Paused), movesRemaining, score, level, alienCellCount.
+      Entities: board cells (cellKind, species, comboType, position). Transactions:
+      executeCluster, spawnAliens, applyGravity, activateCombo, setPhase, addScore.
+      Must call setActiveDb(db) on init, setActiveDb(null) on destroy, wire
+      bridgeEcsToSignals for DOM screens. HIGH risk — central integration point.
+
+  - id: board-renderer
+    name: "Board renderer — 7×9 GPU grid with cell layout and scaling"
+    status: new
+    risk: HIGH
+    complexity: high
+    lifecycle_phase: PLAY
+    cos_required: [canvas, core-interaction, animated-dynamics]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [board-cells]
+      feedback_surfaces: [gpu-canvas]
+    affected_files:
+      - <game-root>/renderers/BoardRenderer.ts
+      - <game-root>/renderers/BlockRenderer.ts
+    dependencies: [ecs-plugin, game-screen-shell-theme]
+    ux:
+      discovery: "Grid fills portrait viewport between HUD and bottom safe zone"
+      feedback: "Cell tap responds in <100 ms; animating state blocks further input"
+      onboarding: "Cells at minimum 44×44 pt tap target; aliens visually 36–56 pt"
+    notes: |
+      7 columns × 9 rows. Grid scales to portrait viewport: HUD top, 64 px logo bottom.
+      On 390×844 with reserved_top_px=0, reserved_bottom_px=64, usable height=780 px.
+      Cell size: min 44 pt, max 56 pt. At 7 cols: max cell width = floor(390/7)=55 pt.
+      Cells use scene-* bundle textures. Stable entity IDs per animated-dynamics contract.
+      Planet cells (Rocky, Bounce) do not fall under gravity (Rocky) / do fall (Bounce).
+      eventMode='passive' on board container; eventMode='static' on individual cells.
+      Renderer follows: init(data, viewportW, viewportH, reservedTop, reservedBottom) pattern.
+
+  - id: alien-entities
+    name: "Alien entity sprites — 5 species with distinct visual identity"
+    status: new
+    risk: MEDIUM
+    complexity: med
+    lifecycle_phase: PLAY
+    cos_required: [canvas, core-interaction]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [board-cells]
+      feedback_surfaces: [gpu-canvas]
+    affected_files:
+      - <game-root>/renderers/BlockRenderer.ts
+      - src/game/asset-manifest.ts
+    dependencies: [board-renderer]
+    ux:
+      discovery: "5 species differ by color + shape + icon (color-alone rule: must use multiple cues)"
+      feedback: "Tapped group lights up before launching animation"
+      onboarding: "Species visible at a glance; no text labels needed"
+    notes: |
+      5 species: Red Zorbling (round), Blue Blipp (teardrop), Green Glurp (blobby),
+      Yellow Yipp (star), Purple Plonk (cube). Must be distinguishable by color AND shape
+      (accessibility: never color alone). Visual size 36–56 pt; tap target 44 pt minimum.
+      Requires scene-* atlas bundle. Frame pool keyed by entity ID for stable identity.
+      Colorblind mode toggle required per core-guidelines.
+
+  - id: planet-entities
+    name: "Planet entities — Rocky Planet (blocker) and Bounce Planet (chain-reaction)"
+    status: new
+    risk: MEDIUM
+    complexity: high
+    lifecycle_phase: PLAY
+    cos_required: [canvas, core-interaction, animated-dynamics, pattern-busters]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: []
+      feedback_surfaces: [gpu-canvas]
+    affected_files:
+      - <game-root>/renderers/BlockRenderer.ts
+      - <game-root>/state/MarsBouncePlugin.ts
+    dependencies: [board-renderer, alien-entities]
+    ux:
+      discovery: "Rocky Planet visually static/unmovable; Bounce Planet animated/bouncy cue"
+      feedback: "Bounce Planet launch: arrow-direction effect + column/row clear animation"
+      onboarding: "Introduced progressively (levels 11+ for planets)"
+    notes: |
+      Rocky Planet: anchored (does not fall), immovable, cleared only by combo blast.
+      Bounce Planet: falls under gravity, activates when adjacent group cleared, launches
+      in random cardinal direction, clears first column/row it crosses.
+      Bounce path computed before animation. Cannot chain Bounce Planets in same frame.
+      CoS pattern-busters deferred to pass secondary per conditions/index.md;
+      Rocky/Bounce Planet infrastructure must be built in core pass but full CoS
+      walk happens at secondary. Record: status deferred-to-pass-secondary for pattern-busters CoS.
+
+  - id: tap-input-handler
+    name: "Tap input handler — cluster selection and invalid tap feedback"
+    status: new
+    risk: HIGH
+    complexity: med
+    lifecycle_phase: PLAY
+    cos_required: [core-interaction, animated-dynamics]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [board-cells, combo-pieces]
+      feedback_surfaces: [gpu-canvas, audio]
+    affected_files:
+      - <game-root>/input/TapHandler.ts
+      - <game-root>/input/interaction-archetype.md
+    dependencies: [board-renderer, ecs-plugin]
+    ux:
+      discovery: "Tapping a group causes immediate highlight → launch animation"
+      feedback: "Valid: group launches off-screen. Invalid (solo): shake animation + thud SFX. Animating: ignored."
+      onboarding: "First tap teaches mechanic without tutorial text (levels 1–3 constrained layout)"
+    notes: |
+      Interaction type: Tap (single pointerdown+pointerup on a cell).
+      Must write interaction-archetype.md before implementing input per core-interaction CoS.
+      Input blocked when boardState != Idle. Pointer events on board container.
+      touch-action: none on canvas container. Tap on isolated cell (group=1) shows
+      reject feedback (cell shake + thud SFX) — never silent reset.
+      HIGH risk: touches GameController + viewport layout.
+
+  - id: gravity-cascade
+    name: "Gravity and cascade system — alien fall, column fill, cascade resolution"
+    status: new
+    risk: MEDIUM
+    complexity: high
+    lifecycle_phase: PLAY
+    cos_required: [animated-dynamics, core-interaction]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: []
+      feedback_surfaces: [gpu-canvas]
+    affected_files:
+      - <game-root>/state/MarsBouncePlugin.ts
+      - <game-root>/renderers/BoardRenderer.ts
+    dependencies: [ecs-plugin, board-renderer]
+    ux:
+      discovery: "Aliens visibly fall under gravity after clear; new aliens bounce in from top"
+      feedback: "Fall: 80 ms ease-in per step. Bounce-in: 200 ms spring overshoot (scale 1.15→1.0)."
+      onboarding: "Gravity is self-evident on first clear"
+    notes: |
+      Rules: Aliens fall down (gravity). Rocky Planets anchored (no fall). Bounce Planets fall.
+      Cascade sweeps top-to-bottom left-to-right in single pass. No mid-cascade chain reactions
+      from newly formed groups. New aliens spawn per-column until column full.
+      New alien species drawn from level's activeSpecies pool (seeded RNG).
+      Animation: each fall step 80 ms ease-in; bounce-in 200 ms spring. Event queue pattern required.
+      Board diff keyed by stable entity ID per animated-dynamics constraint.
+
+  - id: animation-event-queue
+    name: "Animation event queue — logic / visual playback separation"
+    status: new
+    risk: HIGH
+    complexity: high
+    lifecycle_phase: PLAY
+    cos_required: [animated-dynamics, core-interaction]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: []
+      feedback_surfaces: [gpu-canvas]
+    affected_files:
+      - <game-root>/animation/AnimationQueue.ts
+      - <game-root>/animation/AnimationPlayer.ts
+    dependencies: [ecs-plugin, board-renderer, gravity-cascade]
+    ux:
+      discovery: "n/a — implementation detail invisible to player"
+      feedback: "Every action produces a visible animated sequence; no teleportation"
+      onboarding: "n/a"
+    notes: |
+      Game logic resolves instantly (ECS transactions). Animation layer reads event queue,
+      plays back steps: group-highlight → cluster-launch → gravity-drop → spawn-bounce.
+      Event types: cluster-cleared, gravity-drop {position, distance}, elements-entered,
+      combo-activated {type, affected}, bounce-planet-launched {direction, cleared},
+      invalid-tap, win-sequence-start, loss-sequence-start, settle, turn-complete.
+      Input re-enabled only after turn-complete event. HIGH risk — cross-cutting change
+      connecting ECS state, board renderer, and input gate.
+
+  - id: combo-pieces
+    name: "Combo pieces — Rocket Alien, Planet Buster, Cosmic Storm"
+    status: new
+    risk: MEDIUM
+    complexity: high
+    lifecycle_phase: PLAY
+    cos_required: [canvas, core-interaction, animated-dynamics, pattern-busters, scoring]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [combo-piece-cell]
+      feedback_surfaces: [gpu-canvas, audio]
+    affected_files:
+      - <game-root>/state/MarsBouncePlugin.ts
+      - <game-root>/renderers/BlockRenderer.ts
+      - <game-root>/input/TapHandler.ts
+    dependencies: [ecs-plugin, board-renderer, tap-input-handler, alien-entities]
+    ux:
+      discovery: "Large clear (5+ aliens) spawns visually distinct combo piece — player sees it appear"
+      feedback: "Rocket: row/col clear sweep animation. Planet Buster: 3×3 explosion. Cosmic Storm: all-species vortex."
+      onboarding: "Rocket Alien introduced naturally when player clears 5 for first time"
+    notes: |
+      Spawn thresholds: Rocket Alien 5–6, Planet Buster 7–8, Cosmic Storm 9+.
+      Rocket Alien: player swipes at activation to choose row or column direction.
+      Planet Buster: taps to clear 3×3 centered zone.
+      Cosmic Storm: taps to clear all aliens of one random species (uses seeded RNG).
+      Combo pieces activate on tap (count as a move). Visually distinct sprites required.
+      Chain reactions: combo hit inside another combo blast zone activates it too.
+      CoS pattern-busters: secondary pass. Core pass: infrastructure + visual placement.
+      note: pattern-busters CoS gated at secondary pass; core pass must deliver infrastructure.
+
+  - id: hud
+    name: "HUD — move counter, score display, level number, pause button"
+    status: new
+    risk: HIGH
+    complexity: med
+    lifecycle_phase: PLAY
+    cos_required: [canvas, scoring]
+    ux_zones:
+      thumb_zone: out-of-reach
+      touch_targets: [pause-btn]
+      feedback_surfaces: [hud-overlay]
+    affected_files:
+      - <game-root>/renderers/HudRenderer.ts
+      - <game-root>/screens/gameController.ts
+    dependencies: [ecs-plugin, game-screen-shell-theme]
+    ux:
+      discovery: "HUD always visible at top of screen; move counter prominent (top center)"
+      feedback: "Move counter ticks down on each move. Score animates up on each clear."
+      onboarding: "Labels are self-explanatory (score, level, moves)"
+    notes: |
+      Layout: level number top-left, move counter top-center, score top-right, pause top-right corner.
+      Reserved top (Hard/Stretching zone per core-guidelines): passive info only.
+      HUD uses GPU overlay layer (Pixi container) per lifecycle.md wrapper 'hud'.
+      Pause button tap target ≥44×44 pt despite small visual icon.
+      Score digit animation: numbers tick up to final score (per win sequence).
+      Move counter shake on loss sequence trigger.
+      HIGH risk: adds new UI element to viewport, touches GameController.
+
+  - id: board-state-machine
+    name: "Board state machine — Idle / Animating / Won / Lost / Paused"
+    status: new
+    risk: MEDIUM
+    complexity: med
+    lifecycle_phase: PLAY
+    cos_required: [core-interaction, animated-dynamics]
+    ux_zones: {}
+    affected_files:
+      - <game-root>/state/MarsBouncePlugin.ts
+    dependencies: [ecs-plugin]
+    ux:
+      discovery: "n/a — state drives input gate"
+      feedback: "Animating state: taps ignored silently (not visible to player)"
+      onboarding: "n/a"
+    notes: |
+      States: Idle (input open), Animating (input blocked), Won, Lost, Paused.
+      Win condition: alienCellCount==0 AND boardState==Idle → Won.
+      Lose condition: movesRemaining==0 AND alienCellCount>0 AND boardState==Idle → Lost.
+      No state change is instant — minimum 80 ms animation duration.
+      boardState is an ECS resource. bridgeEcsToSignals propagates to DOM screens.
+
+  - id: win-sequence
+    name: "Win sequence — ordered animation (pulse, score tally, screen slide, celebration, button)"
+    status: new
+    risk: MEDIUM
+    complexity: med
+    lifecycle_phase: OUTCOME
+    cos_required: [animated-dynamics, scoring]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [next-level-btn]
+      feedback_surfaces: [gpu-canvas, dom-overlay, score-display]
+    affected_files:
+      - <game-root>/screens/gameController.ts
+      - src/game/screens/ResultsScreen.tsx
+    dependencies: [board-state-machine, animation-event-queue, results-screen-theme]
+    ux:
+      discovery: "Win condition auto-triggers; player cannot miss it"
+      feedback: "Ordered: board pulse → score tally (600 ms) → screen slide (300 ms) → celebration aliens → Next Level button"
+      onboarding: "n/a"
+    notes: |
+      Win sequence steps per GDD:
+      1. boardState → Won. 2. All cells pulse (scale 1.0→1.1→1.0, 200 ms).
+      3. Score tally animation (tick to final, 600 ms). 4. Level Complete Screen slides up (300 ms ease-out).
+      5. Celebration aliens bounce in from edges (staggered, 400 ms total).
+      6. "Next Level" button fade-in (150 ms).
+      Next Level → next level. If last level in chapter → Chapter Complete Screen.
+
+  - id: loss-sequence
+    name: "Loss sequence — ordered animation (shake, droop, screen slide, sad alien, buttons)"
+    status: new
+    risk: MEDIUM
+    complexity: med
+    lifecycle_phase: OUTCOME
+    cos_required: [animated-dynamics]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [try-again-btn, continue-btn]
+      feedback_surfaces: [gpu-canvas, dom-overlay, move-counter]
+    affected_files:
+      - <game-root>/screens/gameController.ts
+      - src/game/screens/ResultsScreen.tsx
+    dependencies: [board-state-machine, animation-event-queue, results-screen-theme]
+    ux:
+      discovery: "Gentle failure tone (never punishing); sad alien is sympathetic"
+      feedback: "Ordered: move counter shake → aliens droop → screen slide → sad alien loop → buttons staggered"
+      onboarding: "Try Again is primary action (bottom, natural zone); Continue is secondary"
+    notes: |
+      Loss sequence steps:
+      1. boardState → Lost. 2. Move counter shakes (wiggle 3×, 300 ms).
+      3. Alien cells droop (scale→0.9, alpha→0.6, 400 ms). 4. Loss Screen slides up (300 ms).
+      5. Sad alien loops (2-frame indefinite). 6. Try Again + Continue fade in (150 ms, staggered 80 ms).
+      Try Again: restart same level fresh board. Continue: 5 extra moves, board state preserved.
+      Continue costs ad or in-game currency — currency system is out of scope for core pass.
+      open question: Continue button backend (ad vs currency) needs resolution.
+
+  - id: continue-system
+    name: "Continue system — ad or currency for 5 extra moves"
+    status: new
+    risk: LOW
+    complexity: med
+    lifecycle_phase: OUTCOME
+    cos_required: []
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [continue-btn]
+      feedback_surfaces: [dom-overlay]
+    affected_files:
+      - src/game/screens/ResultsScreen.tsx
+      - <game-root>/screens/gameController.ts
+    dependencies: [loss-sequence]
+    ux:
+      discovery: "Continue button appears in loss screen with cost indicator"
+      feedback: "5 extra moves added; board state preserved; Animating→Idle"
+      onboarding: "n/a"
+    notes: |
+      Board state is preserved on Continue (seed unchanged, board in memory).
+      movesRemaining += 5. boardState → Idle.
+      Ad integration and currency backend out of scope for core pass.
+      Core pass: button exists, grants 5 moves directly. Ad/currency in meta pass.
+      cos_required is empty — no CoS applies to monetization plumbing; lifecycle_phase=OUTCOME.
+
+  - id: first-time-intro
+    name: "First-time intro — 2-screen visual onboarding (setting + mechanic)"
+    status: new
+    risk: LOW
+    complexity: low
+    lifecycle_phase: TITLE
+    cos_required: [core-interaction]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [tap-to-advance]
+      feedback_surfaces: [dom-overlay, background-illustration]
+    affected_files:
+      - <game-root>/screens/startView.ts
+      - src/game/screens/StartScreen.tsx
+    dependencies: [title-screen-theme]
+    ux:
+      discovery: "Shown only on first session; tap-to-advance is self-evident"
+      feedback: "Tap advances to next intro panel, then to Level 1"
+      onboarding: "Screen 1: Mars colony + aliens waving. Screen 2: grid highlight + tap mechanic caption."
+    notes: |
+      2 illustrated screens: (1) 'They need your help!' (2) 'Tap matching aliens to launch them home.'
+      Player taps to advance. Only shown first session (check localStorage/state flag).
+      Seamless onboarding per lenses.md: mechanic teaches itself, no wall of text.
+      After intro → Level 1 Gameplay Screen.
+
+  - id: chapter-complete-screen
+    name: "Chapter Complete Screen — PROGRESSION interstitial (Mars panorama, confetti)"
+    status: new
+    risk: MEDIUM
+    complexity: med
+    lifecycle_phase: PROGRESSION
+    cos_required: [animated-dynamics]
+    ux_zones:
+      thumb_zone: center
+      touch_targets: [keep-going-btn]
+      feedback_surfaces: [dom-overlay, background-animation]
+    affected_files:
+      - src/game/screens/ResultsScreen.tsx
+      - <game-root>/screens/gameController.ts
+    dependencies: [screen-flow, win-sequence]
+    ux:
+      discovery: "Chapter complete milestone auto-triggered; always shown at chapter boundary"
+      feedback: "Animated Mars panorama + confetti. Chapter number, score, 'Keep Going!' button."
+      onboarding: "n/a — milestone celebration"
+    notes: |
+      Shown when level N is the final level of a chapter. Uses interstitial-screen wrapper
+      per lifecycle.md (optional but GDD requires it). 'Keep Going!' → Title Screen.
+      Chapter score banked; next chapter begins on next play tap from Title.
+      What constitutes a chapter boundary is unspecified — open question.
+
+  - id: level-generation
+    name: "Procedural level generation — seeded RNG, difficulty profiles, grid population"
+    status: new
+    risk: MEDIUM
+    complexity: high
+    lifecycle_phase: PLAY
+    cos_required: [core-interaction, skill-curve]
+    ux_zones: {}
+    affected_files:
+      - <game-root>/level/LevelGenerator.ts
+      - <game-root>/level/SolvabilityValidator.ts
+    dependencies: [ecs-plugin]
+    ux:
+      discovery: "n/a — generation is invisible; player sees the resulting board"
+      feedback: "n/a"
+      onboarding: "Levels 1–10 constrained profile (3 species, no planets, max moves) ensures accessible start"
+    notes: |
+      Seed formula: levelNumber × 12345. Pure function — no Math.random() (use seeded RNG).
+      Steps: seed init → difficulty profile → grid population → planet placement → solvability validation.
+      Validation: reject if largestGroupSize<2, clearablePercent<0.40, or 3×3 Rocky island.
+      Level 1–10 greedy-solver simulation: must clear 80%+ within move limit.
+      Retry: seed += 1, max 10 retries. Fallback: force 3 species, 35 moves, no planets.
+      Difficulty profiles: Levels 1–10 / 11–30 / 31+. Breathing room: every 5th level +5 moves.
+      CoS skill-curve gated at meta pass; record deferred-to-pass-meta for that CoS.
+
+  - id: scoring-system
+    name: "Scoring system — multiplicative dimensions (group size, cascade depth, combo bonus)"
+    status: new
+    risk: LOW
+    complexity: med
+    lifecycle_phase: PLAY
+    cos_required: [scoring]
+    ux_zones:
+      thumb_zone: out-of-reach
+      touch_targets: []
+      feedback_surfaces: [hud-score, score-tally-animation]
+    affected_files:
+      - <game-root>/state/MarsBouncePlugin.ts
+    dependencies: [ecs-plugin, hud]
+    ux:
+      discovery: "Score increments on every clear; larger clears produce larger jumps"
+      feedback: "Score digit animation on HUD after each clear; score tally at level end"
+      onboarding: "Score is self-explanatory"
+    notes: |
+      GDD does not specify a scoring formula; one must be designed per CoS scoring constraints.
+      Must be multiplicative not additive: at minimum groupSize × cascadeMultiplier.
+      Proposed shape (plan phase to confirm):
+        groupScore = (groupSize - 1) × 100
+        cascadeMultiplier = cascadeDepth + 1
+        comboBonus = comboActivated ? 500 : 0
+        moveEfficiency = baseMoves / actualMoves (applied at level end)
+        levelScore += (groupScore × cascadeMultiplier + comboBonus) per clear
+      Wide range required: skilled player 3× beginner on same level.
+      open question: exact formula values are design decisions; plan phase must specify.
+
+conflicts: []
+
+risk_areas:
+  - feature: ecs-plugin
+    reason: "Central integration point — all game state flows through this. Blocking dependency for board-renderer, tap-input-handler, animation-event-queue, and all renderers."
+  - feature: animation-event-queue
+    reason: "Cross-cutting — connects ECS transactions, board renderer, input gate, and all animated sequences. Incorrect event ordering will break board physics feel."
+  - feature: game-screen-shell-theme
+    reason: "Switches gameMode from 'dom' to 'pixi'. Touches GameController — every downstream feature depends on this transition working correctly."
+  - feature: hud
+    reason: "Adds new UI element to viewport. Viewport budget must be computed before board-renderer sizes cells. Must not overlap board or logo."
+  - feature: tap-input-handler
+    reason: "Pixi event model wiring. touch-action:none, pointer capture, and input-gate must all be correct or game is unplayable. Also wires combo activation direction input (swipe on Rocket Alien)."
+
+open_questions:
+  - id: q-scoring-formula
+    question: "What are the exact scoring formula coefficients? GDD says score accumulates but gives no formula."
+    context: "CoS scoring requires multiplicative dimensions. Plan phase must define group bonus scale, cascade multiplier, combo bonuses, and move efficiency factor."
+  - id: q-chapter-boundary
+    question: "What constitutes a chapter? How many levels per chapter?"
+    context: "GDD shows Chapter Complete Screen at 'chapter goal met' but never defines chapter size. Level generation profiles (1–10, 11–30, 31+) could map to chapters but this is unconfirmed."
+  - id: q-continue-backend
+    question: "Continue system: should the core-pass implementation use a stub (grant moves directly) or wire ad/currency scaffolding?"
+    context: "GDD says 'ad or in-game currency for extra moves' but neither ads nor currency backend is in the scaffold. Core pass scope needs clarification."
+  - id: q-rocket-alien-direction
+    question: "Rocket Alien direction: GDD says 'direction chosen by player via swipe at moment of use'. How does this interact with the single-tap interaction archetype?"
+    context: "The primary interaction is Tap. Rocket Alien requires a swipe to select row vs column. This is a second gesture type. Plan must define whether this is a modal tap-then-swipe or a swipe-only activation."

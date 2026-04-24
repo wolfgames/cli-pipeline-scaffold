@@ -1,0 +1,151 @@
+pass_gate:
+  status: complete
+  pass: core
+  previous_pass_stable: true
+  previous_run_ref: null
+  skip_reason: ""
+  carry_forward: {}
+
+plan:
+  status: complete
+  gdd_type: "additive"
+  batches: 9
+  features: 22
+  new_files: 19
+  modified_files: 7
+  viewport_budget:
+    hud_px: 60
+    board_cell_px: 55
+    board_cols: 7
+    board_rows: 9
+    total_px: 635
+    available_px: 844
+    touch_target_check: "PASS"
+    tile_cap_check: "PASS"
+  resolved_questions: 5
+  out_of_pass_cos: []
+  warnings: []
+  resolved_questions_scalars:
+    q-game-name: "mars-bounce"
+    q-scoring-formula: "groupScore=(groupSize-1)*100 * (cascadeDepth+1) + comboBonus(500)"
+    q-chapter-boundary: 10
+    q-continue-backend: "stub-core-pass"
+    q-rocket-alien-direction: "modal-tap-then-row-col-tap"
+  carry_forward:
+    game_slug: "mars-bounce"
+    hook_batch: 2
+    priority_ordering_applied: true
+    cos_deferred_to_batch:
+      pattern-busters: 7
+      skill-curve: "deferred-to-pass-meta"
+    viewport_budget_derived_from: "greenfield_defaults"
+    critical_integration_point: "ecs-plugin"
+
+prime:
+  status: complete
+  project: "Mars Bounce (cli-pipeline-scaffold)"
+  stack: "pixi + solidjs + gsap + bun (vite, vitest)"
+  existing_features: 10
+  dom_overlays:
+    - element: WolfGamesLogo
+      position: bottom
+      height-px: 64
+  carry_forward:
+    target_device: "iPhone reference portrait 390x844 (dvh)"
+    game_greenfield: true
+    reserved_bottom_px: 64
+    reserved_top_px: 0
+    game_controller_stub: true
+    stack_gaps: []
+    host_rules_missing: true
+
+analyze:
+  status: complete
+  feature_counts:
+    exists: 6
+    partial: 1
+    new: 17
+    conflict: 0
+    content_gap: 4
+  conflict_breakdown:
+    reuse: 0
+    adapt: 0
+    replace: 0
+  high_risk:
+    - title-screen-theme
+    - game-screen-shell-theme
+    - ecs-plugin
+    - board-renderer
+    - tap-input-handler
+    - animation-event-queue
+    - hud
+  medium_risk:
+    - screen-flow
+    - loading-screen-theme
+    - results-screen-theme
+    - alien-entities
+    - planet-entities
+    - gravity-cascade
+    - combo-pieces
+    - board-state-machine
+    - win-sequence
+    - loss-sequence
+    - chapter-complete-screen
+    - level-generation
+  open_questions: 4
+  carry_forward:
+    critical_integration_point: ecs-plugin
+    transformative_hint: true
+
+implement:
+  status: complete
+  batches_completed: 9
+  tests_total: 52
+  test_files: 9
+  all_tests_pass: true
+  files_created:
+    - src/game/mars-bounce/state/MarsBouncePlugin.ts
+    - src/game/mars-bounce/index.ts
+    - src/game/mars-bounce/renderers/BoardRenderer.ts
+    - src/game/mars-bounce/renderers/BlockRenderer.ts
+    - src/game/mars-bounce/renderers/HudRenderer.ts
+    - src/game/mars-bounce/input/TapHandler.ts
+    - src/game/mars-bounce/animation/AnimationPlayer.ts
+    - src/game/mars-bounce/level/LevelGenerator.ts
+    - src/game/mars-bounce/level/SolvabilityValidator.ts
+    - src/game/mars-bounce/screens/startView.ts
+    - src/game/mars-bounce/screens/loadingTheme.ts
+    - src/game/mars-bounce/screens/gameController.ts
+    - tests/unit/game/mars-bounce/state/MarsBouncePlugin.test.ts
+    - tests/unit/game/mars-bounce/renderers/BoardRenderer.test.ts
+    - tests/unit/game/mars-bounce/renderers/BlockRenderer.test.ts
+    - tests/unit/game/mars-bounce/renderers/HudRenderer.test.ts
+    - tests/unit/game/mars-bounce/input/TapHandler.test.ts
+    - tests/unit/game/mars-bounce/animation/AnimationQueue.test.ts
+    - tests/unit/game/mars-bounce/level/LevelGenerator.test.ts
+    - tests/unit/game/mars-bounce/screens/startScreen.test.ts
+  files_modified:
+    - src/game/screens/LoadingScreen.tsx
+    - src/game/screens/StartScreen.tsx
+    - src/game/screens/ResultsScreen.tsx
+    - tests/unit/game/mars-bounce/GameController.test.ts
+  batch_summary:
+    batch_1: "ECS plugin — MarsBouncePlugin resources, initLevel, executeCluster, applyGravity, scoring"
+    batch_2: "BoardRenderer — grid layout, updateBoard, COLS=7 ROWS=9 constraints"
+    batch_3: "BlockRenderer + HudRenderer — sprite pools, score/moves/level display, ≥44px touch targets"
+    batch_4: "TapHandler — input routing, rocket direction modal, combo/invalid-tap paths"
+    batch_5: "AnimationPlayer — sequential event queue, STATE_EVENTS gate, phase management; TapHandler wire"
+    batch_6: "LevelGenerator + SolvabilityValidator — LCG seed, difficulty profiles, BFS flood-fill validation; win/loss/continue ECS tests"
+    batch_7: "Bounce planet logic — 4-directional neighbor check, firedBounce guard; combo thresholds (rocket/planet-buster/cosmic-storm)"
+    batch_8: "LoadingTheme + StartView — LOADING_BG_COLOR Mars red, createStartView factory, setupStartScreen scaffold contract; LoadingScreen/StartScreen wired"
+    batch_9: "ResultsScreen chapter-complete branch — chapter number, chapter score ScoreTally, Keep Going! button resets chapterScore; all chapter boundary ECS tests"
+  cos_findings:
+    - "applyGravity skipRefill=true two-pass pattern required for win-check before refill"
+    - "collectPlaybackOrder must be async (AnimationQueue test)"
+    - "activeDb() signal (not getActiveDb()) for ResultsScreen ECS access"
+    - "makeBoardWithGroup raster order (row=i/7, col=i%7) for COLS=7 boundary"
+  cos_gaps: []
+  carry_forward:
+    animation_gsap_integration: "playEvent stub in gameController; real GSAP tweens deferred to visual pass"
+    sprite_atlas_integration: "emoji fallbacks used throughout; atlas sprites deferred to asset pass"
+    audio_integration: "audio hooks present in deps; sound playback deferred to audio pass"

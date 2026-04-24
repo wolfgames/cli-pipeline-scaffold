@@ -6,8 +6,8 @@ import { useGameTracking } from '~/game/setup/tracking';
 
 import type { GameTuning } from '~/game/tuning';
 
-// Game-specific start screen — swap this import for a different game
-import { setupStartScreen } from '~/game/mygame/screens/startView';
+// Game-specific start screen
+import { setupStartScreen } from '~/game/mars-bounce/screens/startView';
 
 export default function StartScreen() {
   const { goto } = useScreen();

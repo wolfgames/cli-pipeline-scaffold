@@ -1,11 +1,11 @@
 import { onMount, createMemo, Show } from 'solid-js';
-import { Spinner } from '@wolfgames/components/solid';
 import { useScreen } from '~/core/systems/screens';
 import { useAssets, useLoadingState } from '~/core/systems/assets';
 import { useManifest } from '@wolfgames/components/solid';
 import { useTuning, type ScaffoldTuning } from '~/core';
 import { Logo } from '~/core/ui/Logo';
 import type { GameTuning } from '~/game/tuning';
+import { LOADING_BG_COLOR, LOADING_PROGRESS_COLOR, LOADING_TRACK_COLOR } from '~/game/mars-bounce/screens/loadingTheme';
 
 export function LoadingScreen() {
   const { goto } = useScreen();
@@ -94,13 +94,24 @@ export function LoadingScreen() {
   });
 
   return (
-    <div class="fixed inset-0 flex flex-col items-center justify-center bg-[#BCE083]">
+    <div
+      class="fixed inset-0 flex flex-col items-center justify-center"
+      style={{ 'background-color': LOADING_BG_COLOR }}
+    >
+      {/* Mars landscape header — emoji fallback until scene atlas available */}
+      <div class="text-6xl mb-6 text-center" role="img" aria-label="Mars landscape">
+        🌋🪐🌌
+      </div>
+
+      <h1 class="text-2xl font-bold text-white mb-2">Mars Bounce</h1>
+      <p class="text-white/60 text-sm mb-8">Loading the colony…</p>
+
       <Show
         when={failedBundles().length === 0}
         fallback={
           <div class="text-center max-w-sm px-6">
-            <p class="text-lg font-semibold text-gray-800 mb-2">Unable to load</p>
-            <p class="text-sm text-gray-600 mb-4">
+            <p class="text-lg font-semibold text-white mb-2">Unable to load</p>
+            <p class="text-sm text-white/60 mb-4">
               Failed to load: {failedBundles().join(', ')}
             </p>
             <button
@@ -112,13 +123,17 @@ export function LoadingScreen() {
           </div>
         }
       >
-        <Spinner size="lg" class="w-24 h-24 text-gray-800" />
-        <div class="mt-8 w-64 h-2 bg-white/30 rounded-full overflow-hidden">
+        {/* Animated Mars-themed progress bar — no spinner */}
+        <div
+          class="w-64 h-3 rounded-full overflow-hidden"
+          style={{ 'background-color': LOADING_TRACK_COLOR }}
+        >
           <div
-            class="h-full bg-gray-800 rounded-full transition-all duration-300"
-            style={{ width: `${progress()}%` }}
+            class="h-full rounded-full transition-all duration-300"
+            style={{ width: `${progress()}%`, 'background-color': LOADING_PROGRESS_COLOR }}
           />
         </div>
+        <p class="text-white/40 text-xs mt-3">{Math.round(progress())}%</p>
       </Show>
 
       {themeLoaded() && (

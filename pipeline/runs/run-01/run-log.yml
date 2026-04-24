@@ -1,0 +1,20 @@
+run: "01"
+pipeline_version: "0.3.8"
+pass: "core"
+started: "2026-04-23T00:00:00Z"
+config:
+  think_only: false
+  trace: false
+  skip_groups: []
+  allow_skip_pass: false
+
+phases:
+  - id: pass-gate
+    status: complete
+    summary: "core pass has no N-1 gate check; pass_gate resolved to complete (core-pass-no-check)"
+  - id: prime
+    status: complete
+    summary: "stack detected: pixi+solidjs+gsap+bun(vite,vitest); game is greenfield DOM stub; 1 DOM overlay (WolfGamesLogo bottom 64px); buildCmd=bun run build; testCmd=bun run test:run; host_rules_missing (no .claude/rules/*.md files)"
+
+finished: ""
+status: ""
